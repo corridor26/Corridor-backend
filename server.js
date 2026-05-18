@@ -54,36 +54,27 @@ app.use((err, req, res, next) => {
 
 // Start server
 async function startServer() {
+  // Listen immediately so Railway sees the port open
+  app.listen(PORT, () => {
+    console.log(`[SERVER] ✓ Corridor backend running on port ${PORT}`);
+    console.log(`[SERVER] API endpoints: /api/trips /api/search /api/status /health /api/db-health`);
+  });
+
+  // Test DB and kick off scrapers in the background
   try {
-    // Test database connection
     console.log('[SERVER] Testing database connection...');
     const result = await pool.query('SELECT NOW()');
     console.log('[SERVER] ✓ Database connected:', result.rows[0].now);
 
-    // Initialize scheduler
     console.log('[SERVER] Initializing scraper scheduler...');
     initializeScheduler();
 
-    // Run scrapers on startup
     console.log('[SERVER] Running initial scraper jobs...');
-    await runScrapersOnStartup();
-
-    // Start listening
-    app.listen(PORT, () => {
-      console.log(`[SERVER] ✓ Corridor backend running on port ${PORT}`);
-      console.log(`[SERVER] Frontend base URL: http://localhost:${PORT}`);
-      console.log(`[SERVER] API endpoints:`);
-      console.log(`  - GET  /api/trips`);
-      console.log(`  - POST /api/trips`);
-      console.log(`  - GET  /api/trips/:id`);
-      console.log(`  - GET  /api/search?origin=NYP&destination=WAS&date=2026-03-15`);
-      console.log(`  - GET  /api/status`);
-      console.log(`  - GET  /health`);
-      console.log(`  - GET  /api/db-health`);
-    });
+    runScrapersOnStartup().catch(err =>
+      console.error('[SERVER] Startup scrapers failed (non-fatal):', err.message)
+    );
   } catch (error) {
-    console.error('[SERVER] Failed to start:', error);
-    process.exit(1);
+    console.error('[SERVER] Database connection failed:', error.message);
   }
 }
 
