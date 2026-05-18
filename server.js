@@ -6,6 +6,7 @@ import tripsRouter from './routes/trips.js';
 import searchRouter, { statusRouter } from './routes/search.js';
 import { initializeScheduler, runScrapersOnStartup } from './scraper/scheduler.js';
 import pool from './config/database.js';
+import { runMigrations } from './scripts/migrate.js';
 
 dotenv.config();
 
@@ -65,6 +66,10 @@ async function startServer() {
     console.log('[SERVER] Testing database connection...');
     const result = await pool.query('SELECT NOW()');
     console.log('[SERVER] ✓ Database connected:', result.rows[0].now);
+
+    console.log('[SERVER] Running migrations...');
+    await runMigrations();
+    console.log('[SERVER] ✓ Migrations complete');
 
     console.log('[SERVER] Initializing scraper scheduler...');
     initializeScheduler();

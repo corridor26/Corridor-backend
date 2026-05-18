@@ -101,23 +101,22 @@ CREATE INDEX IF NOT EXISTS idx_prices_origin_dest ON prices(origin, destination,
 CREATE INDEX IF NOT EXISTS idx_historical_delays_origin_dest ON historical_delays(origin, destination)
 `;
 
-async function runMigrations() {
+export async function runMigrations() {
+  const statements = migrations.split(';').filter(stmt => stmt.trim());
+  for (const statement of statements) {
+    if (statement.trim()) {
+      await pool.query(statement);
+    }
+  }
+  await insertSampleRoutes();
+}
+
+// Called directly via `npm run migrate`
+async function runMigrationsCLI() {
   try {
     console.log('Starting database migrations...');
-
-    const statements = migrations.split(';').filter(stmt => stmt.trim());
-
-    for (const statement of statements) {
-      if (statement.trim()) {
-        await pool.query(statement);
-        console.log('✓ Migration executed');
-      }
-    }
-
+    await runMigrations();
     console.log('✓ All migrations completed successfully');
-
-    await insertSampleRoutes();
-
     await pool.end();
     process.exit(0);
   } catch (error) {
@@ -147,4 +146,4 @@ async function insertSampleRoutes() {
   console.log('✓ Sample routes inserted');
 }
 
-runMigrations();
+runMigrationsCLI();
