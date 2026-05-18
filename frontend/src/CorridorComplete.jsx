@@ -43,6 +43,11 @@ const formatDate = (dateStr) => {
 
 const today = () => new Date().toISOString().split('T')[0];
 
+const buildAmtrakUrl = (fromCode, toCode, dateStr) => {
+  const [year, month, day] = dateStr.split('-');
+  return `https://www.amtrak.com/booking/journey-stops.html?fromStationCode=${fromCode}&toStationCode=${toCode}&departDate=${month}/${day}/${year}&numberOfAdults=1`;
+};
+
 // ─── LOGO ────────────────────────────────────────────────────────
 const LogoMark = ({ white = false }) => (
   <svg width="40" height="20" viewBox="0 0 80 40" style={{ marginRight: '10px' }}>
@@ -225,6 +230,7 @@ const TripsScreen = ({ onSelectTrip }) => {
           ...t,
           trainName: getTrainName(t.trainNumber),
           number: t.trainNumber,
+          rawDate: t.date,
           date: formatDate(t.date),
         }));
         setTrips(mapped);
@@ -432,18 +438,20 @@ const TripDetailScreen = ({ trip, onBack }) => {
           </div>
         </div>
 
-        <button style={{
-          width: '100%',
-          ...DISPLAY,
-          fontSize: '9px',
-          padding: '14px',
-          borderRadius: '6px',
-          border: 'none',
-          background: C.fieldBlue,
-          color: '#fff',
-          cursor: 'pointer',
-          letterSpacing: '0.05em',
-        }}>
+        <button
+          onClick={() => window.open(buildAmtrakUrl(trip.fromCode, trip.toCode, trip.rawDate || today()), '_blank')}
+          style={{
+            width: '100%',
+            ...DISPLAY,
+            fontSize: '9px',
+            padding: '14px',
+            borderRadius: '6px',
+            border: 'none',
+            background: C.fieldBlue,
+            color: '#fff',
+            cursor: 'pointer',
+            letterSpacing: '0.05em',
+          }}>
           Book on Amtrak →
         </button>
       </div>
@@ -452,12 +460,34 @@ const TripDetailScreen = ({ trip, onBack }) => {
 };
 
 // ─── SCREEN: BOOKING ─────────────────────────────────────────────
-const BookingScreen = () => {
+const BookingScreen = ({ onSaved }) => {
   const [from, setFrom] = useState('NYP');
   const [to, setTo] = useState('WAS');
   const [date, setDate] = useState(today());
   const [searchResults, setSearchResults] = useState(null);
   const [searching, setSearching] = useState(false);
+  const [savedId, setSavedId] = useState(null);
+
+  const handleSave = async (result) => {
+    try {
+      await fetch(`${API_BASE}/api/trips`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trainNumber: result.train,
+          origin: from,
+          destination: to,
+          departureDate: date,
+          departureTime: result.time,
+          arrivalTime: result.arrival,
+        }),
+      });
+      setSavedId(result.id);
+      setTimeout(() => onSaved(), 1000);
+    } catch {
+      // retry silently
+    }
+  };
 
   const isSameDay = () => date === today();
 
@@ -601,8 +631,16 @@ const BookingScreen = () => {
                   </div>
                 </div>
 
-                <button style={{ width: '100%', ...DISPLAY, fontSize: '9px', padding: '10px', borderRadius: '4px', border: 'none', background: C.fieldBlue, color: '#fff', cursor: 'pointer', letterSpacing: '0.05em' }}>
+                <button
+                  onClick={() => window.open(buildAmtrakUrl(from, to, date), '_blank')}
+                  style={{ width: '100%', ...DISPLAY, fontSize: '9px', padding: '10px', borderRadius: '4px', border: 'none', background: C.fieldBlue, color: '#fff', cursor: 'pointer', letterSpacing: '0.05em' }}>
                   Book on Amtrak →
+                </button>
+                <button
+                  onClick={() => handleSave(result)}
+                  disabled={savedId === result.id}
+                  style={{ width: '100%', ...DISPLAY, fontSize: '9px', padding: '10px', borderRadius: '4px', border: `1px solid ${C.fieldBlue}`, background: savedId === result.id ? C.greenLight : 'transparent', color: savedId === result.id ? C.green : C.fieldBlue, cursor: savedId === result.id ? 'default' : 'pointer', letterSpacing: '0.05em', marginTop: '8px' }}>
+                  {savedId === result.id ? 'Saved ✓' : 'Save Trip'}
                 </button>
               </div>
             ))}
@@ -648,7 +686,7 @@ export default function CorridorApp() {
         ) : activeTab === 'trips' ? (
           <TripsScreen onSelectTrip={(trip) => { setSelectedTrip(trip); setDetailScreen(true); }} />
         ) : (
-          <BookingScreen />
+          <BookingScreen onSaved={() => { setActiveTab('trips'); setDetailScreen(false); }} />
         )}
       </div>
       <NavBar active={activeTab} onNav={(tab) => { setActiveTab(tab); setDetailScreen(false); }} />

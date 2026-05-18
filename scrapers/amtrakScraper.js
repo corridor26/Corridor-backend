@@ -1,91 +1,86 @@
-// scrapers/amtrakScraper.js
+import axios from 'axios';
 import pool from '../config/database.js';
 
+const TARGET_TRAINS = [
+  { number: '2151', origin: 'NYP', destination: 'WAS' },
+  { number: '2153', origin: 'NYP', destination: 'WAS' },
+  { number: '2155', origin: 'NYP', destination: 'WAS' },
+  { number: '2150', origin: 'WAS', destination: 'NYP' },
+  { number: '2152', origin: 'WAS', destination: 'NYP' },
+  { number: '137',  origin: 'WAS', destination: 'BOS' },
+  { number: '139',  origin: 'BOS', destination: 'WAS' },
+];
+
+const STATION_NAMES = {
+  NYP: 'New York Penn Station', NWK: 'Newark, NJ', MET: 'Metropark, NJ',
+  TRE: 'Trenton, NJ', PHL: 'Philadelphia, PA', WIL: 'Wilmington, DE',
+  ABE: 'Aberdeen, MD', BAL: 'Baltimore, MD', BWI: 'BWI Airport, MD',
+  NCR: 'New Carrollton, MD', WAS: 'Washington Union Station',
+  NHV: 'New Haven, CT', PVD: 'Providence, RI', BOS: 'Boston South Station',
+};
+
 export async function scrapeAmtrakDelays() {
-  let browser;
   const startTime = Date.now();
-  
+
   try {
-    console.log('[SCRAPER] Starting Amtrak delays scrape...');
-    
-    // Target trains (Northeast Corridor, Acela, etc)
-    const targetTrains = [
-      { number: '2151', origin: 'NYP', destination: 'WAS', type: 'Acela' },
-      { number: '2153', origin: 'NYP', destination: 'WAS', type: 'Acela' },
-      { number: '2155', origin: 'NYP', destination: 'WAS', type: 'Acela' },
-      { number: '137', origin: 'WAS', destination: 'BOS', type: 'Northeast Regional' },
-      { number: '139', origin: 'BOS', destination: 'WAS', type: 'Northeast Regional' },
-    ];
+    console.log('[SCRAPER] Fetching real-time delays from Amtraker API...');
+    const today = new Date().toISOString().split('T')[0];
+    let updated = 0;
 
-    // Mock data for MVP (in production, would actually scrape Amtrak)
-    const mockDelays = [
-      { trainNumber: '2151', origin: 'NYP', destination: 'WAS', delay: 4, location: 'Near Wilmington, DE', status: 'delayed' },
-      { trainNumber: '2153', origin: 'NYP', destination: 'WAS', delay: 0, location: 'Philadelphia, PA', status: 'on_time' },
-      { trainNumber: '2155', origin: 'NYP', destination: 'WAS', delay: 8, location: 'Baltimore, MD', status: 'delayed' },
-      { trainNumber: '137', origin: 'WAS', destination: 'BOS', delay: 0, location: 'New York, NY', status: 'on_time' },
-      { trainNumber: '139', origin: 'BOS', destination: 'WAS', delay: 12, location: 'Newark, NJ', status: 'delayed' },
-    ];
+    for (const train of TARGET_TRAINS) {
+      try {
+        const { data } = await axios.get(
+          `https://api.amtraker.com/v3/trains/${train.number}`,
+          { timeout: 10000, headers: { 'User-Agent': 'Corridor-App/1.0' } }
+        );
 
-    let inserted = 0;
+        const instances = data[train.number];
+        if (!instances || instances.length === 0) continue; // train not running today
 
-    for (const trainData of mockDelays) {
-      await pool.query(
-        `INSERT INTO delays (train_number, origin, destination, departure_date, current_delay_minutes, current_location, status, last_updated)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-         ON CONFLICT (train_number, departure_date)
-         DO UPDATE SET current_delay_minutes = $5, current_location = $6, status = $7, last_updated = NOW()`,
-        [
-          trainData.trainNumber,
-          trainData.origin,
-          trainData.destination,
-          new Date().toISOString().split('T')[0],
-          trainData.delay,
-          trainData.location,
-          trainData.status
-        ]
-      );
-      inserted++;
+        const t = instances[0];
+
+        // Delay = difference between scheduled and estimated time at next event point
+        let delayMinutes = 0;
+        if (t.eventSchTime && t.eventEstTime) {
+          const diff = new Date(t.eventEstTime) - new Date(t.eventSchTime);
+          delayMinutes = Math.max(0, Math.round(diff / 60000));
+        }
+
+        const locationCode = t.eventCode || null;
+        const currentLocation = locationCode ? (STATION_NAMES[locationCode] || locationCode) : null;
+        const status = delayMinutes > 5 ? 'delayed' : 'on_time';
+
+        await pool.query(
+          `INSERT INTO delays (train_number, origin, destination, departure_date, current_delay_minutes, current_location, status, last_updated)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+           ON CONFLICT (train_number, departure_date)
+           DO UPDATE SET current_delay_minutes = $5, current_location = $6, status = $7, last_updated = NOW()`,
+          [train.number, train.origin, train.destination, today, delayMinutes, currentLocation, status]
+        );
+        updated++;
+      } catch {
+        // train not running or API unavailable — skip silently
+      }
     }
 
-    // Log the scrape
     const executionTime = Date.now() - startTime;
     await pool.query(
       `INSERT INTO scraper_logs (scraper_name, status, message, rows_affected, execution_time_ms)
        VALUES ($1, $2, $3, $4, $5)`,
-      ['amtrak_delays', 'success', `Scraped ${inserted} train delays`, inserted, executionTime]
+      ['amtrak_delays', 'success', `Updated ${updated} trains via Amtraker API`, updated, executionTime]
     );
 
-    console.log(`[SCRAPER] ✓ Completed in ${executionTime}ms. Inserted ${inserted} records.`);
-    return { success: true, rowsInserted: inserted, executionTime };
+    console.log(`[SCRAPER] ✓ Completed in ${executionTime}ms. Updated ${updated} trains.`);
+    return { success: true, rowsInserted: updated, executionTime };
 
   } catch (error) {
     console.error('[SCRAPER] Error:', error);
-    
-    // Log the failure
     const executionTime = Date.now() - startTime;
     await pool.query(
       `INSERT INTO scraper_logs (scraper_name, status, message, execution_time_ms)
        VALUES ($1, $2, $3, $4)`,
       ['amtrak_delays', 'failed', error.message, executionTime]
     );
-
     return { success: false, error: error.message };
-
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
   }
-}
-
-// Helper function to extract delays from Amtrak Track Your Train page
-// This would be called from the browser context
-async function extractDelaysFromPage() {
-  // This would run inside Puppeteer's browser context
-  return {
-    trainNumber: document.querySelector('[data-train-number]')?.textContent,
-    delay: parseInt(document.querySelector('[data-delay]')?.textContent || 0),
-    location: document.querySelector('[data-location]')?.textContent,
-    status: document.querySelector('[data-status]')?.textContent,
-  };
 }
