@@ -14,22 +14,27 @@ router.get('/', async (req, res) => {
       return res.status(400).json({ error: 'Missing required query parameters: origin, destination, date' });
     }
 
-    // Get sample prices for this route
-    const priceResult = await pool.query(
-      `SELECT DISTINCT train_number, current_price, high_24h, low_24h, trend
-       FROM prices
-       WHERE origin = $1 AND destination = $2 AND departure_date = $3
-       ORDER BY current_price ASC`,
-      [origin, destination, date]
-    );
+    const mockTrains = [
+      { time: '07:05', arriveTime: '09:42', price: 94, delay: 4, train: '2151' },
+      { time: '09:30', arriveTime: '12:15', price: 78, delay: 0, train: '2153' },
+      { time: '14:30', arriveTime: '17:05', price: 68, delay: 12, train: '2155' },
+    ];
 
-    // If no prices found, return mock data
+    // Get sample prices for this route
+    let priceResult;
+    try {
+      priceResult = await pool.query(
+        `SELECT DISTINCT train_number, current_price, high_24h, low_24h, trend
+         FROM prices
+         WHERE origin = $1 AND destination = $2 AND departure_date = $3
+         ORDER BY current_price ASC`,
+        [origin, destination, date]
+      );
+    } catch {
+      return res.json(mockTrains);
+    }
+
     if (priceResult.rows.length === 0) {
-      const mockTrains = [
-        { time: '07:05', arriveTime: '09:42', price: 94, delay: 4, train: '2151' },
-        { time: '09:30', arriveTime: '12:15', price: 78, delay: 0, train: '2153' },
-        { time: '14:30', arriveTime: '17:05', price: 68, delay: 12, train: '2155' },
-      ];
       return res.json(mockTrains);
     }
 
