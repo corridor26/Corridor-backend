@@ -1,0 +1,9 @@
+# railway.json (deployment config for Railway)
+{
+  "build": {
+    "builder": "nixpacks"
+  },
+  "deploy": {
+    "startCommand": "npm start"
+  }
+}
