@@ -146,4 +146,8 @@ async function insertSampleRoutes() {
   console.log('✓ Sample routes inserted');
 }
 
-runMigrationsCLI();
+// Only runs when executed directly via `npm run migrate`, not when imported
+const isMain = process.argv[1].endsWith('scripts/migrate.js');
+if (isMain) {
+  runMigrationsCLI();
+}
