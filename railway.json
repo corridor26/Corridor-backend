@@ -1,4 +1,3 @@
-# railway.json (deployment config for Railway)
 {
   "build": {
     "builder": "nixpacks"
