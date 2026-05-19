@@ -1,0 +1,25 @@
+# System libraries required to run Chromium (used by puppeteer)
+# Puppeteer downloads its own Chrome during npm install; this provides the runtime deps.
+[phases.setup]
+nixPkgs = [
+  "nss",
+  "nspr",
+  "atk",
+  "cups",
+  "dbus",
+  "libdrm",
+  "libxkbcommon",
+  "mesa",
+  "pango",
+  "xorg.libX11",
+  "xorg.libXcomposite",
+  "xorg.libXdamage",
+  "xorg.libXext",
+  "xorg.libXfixes",
+  "xorg.libXrandr",
+  "xorg.libxcb",
+  "alsa-lib",
+  "expat",
+  "glib",
+  "gtk3"
+]
