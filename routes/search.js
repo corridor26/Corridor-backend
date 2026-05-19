@@ -3,6 +3,7 @@ import express from 'express';
 import axios from 'axios';
 import pool from '../config/database.js';
 import { predictDelay } from '../utils/delayPredictor.js';
+import { scrapeFaresForSearch } from '../scrapers/fareScraper.js';
 
 const router = express.Router();
 
@@ -293,9 +294,23 @@ async function searchAmtrakLive(origin, destination, dateStr) {
 // GET /api/search
 router.get('/', async (req, res) => {
   try {
-    const { origin, destination, date } = req.query;
+    const { origin, destination, date, live } = req.query;
     if (!origin || !destination || !date) {
       return res.status(400).json({ error: 'Missing required query parameters: origin, destination, date' });
+    }
+
+    // When live=true, trigger a fresh Puppeteer scrape for this exact route+date
+    // before enriching results — gives freshest fare data
+    if (live === 'true') {
+      try {
+        await Promise.race([
+          scrapeFaresForSearch(origin, destination, date),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('scrape timeout')), 40000)),
+        ]);
+        console.log(`[SEARCH] Live scrape complete for ${origin}→${destination} ${date}`);
+      } catch (err) {
+        console.log(`[SEARCH] Live scrape ended: ${err.message}`);
+      }
     }
 
     // Try live Amtrak data first — accurate real schedule
@@ -323,6 +338,7 @@ router.get('/', async (req, res) => {
         const days = s.days_of_week.split(',').map(d => parseInt(d.trim()));
         return days.includes(dow);
       });
+
 
       trains = daySchedules.map(sched => {
         const trainType = sched.train_type;
@@ -354,7 +370,6 @@ router.get('/', async (req, res) => {
     // Enrich each train with fare and delay data
     const enriched = await Promise.all(
       trains.map(async (t) => {
-        // Fare: check fare_observations first, then prices table, then estimate
         let price = t.price;
         let fareSource = t.fareSource;
 
@@ -368,7 +383,7 @@ router.get('/', async (req, res) => {
               [origin, destination, date, t.train]
             );
             if (obsRow.rows.length > 0) {
-              price     = parseFloat(obsRow.rows[0].lowest_fare);
+              price      = parseFloat(obsRow.rows[0].lowest_fare);
               fareSource = 'live';
             }
           } catch {}
@@ -383,16 +398,16 @@ router.get('/', async (req, res) => {
               [origin, destination, t.train, date]
             );
             if (prRow.rows.length > 0) {
-              price     = parseFloat(prRow.rows[0].current_price);
+              price      = parseFloat(prRow.rows[0].current_price);
               fareSource = 'scraped';
-              t.trend   = prRow.rows[0].trend || null;
+              t.trend    = prRow.rows[0].trend || null;
             }
           } catch {}
         }
 
         if (!price) {
           const routeKey = getApplicableRouteKeys(origin, destination)[0] || `${origin}-${destination}`;
-          price     = estimatePrice(routeKey, t.trainType, t.time, date);
+          price      = estimatePrice(routeKey, t.trainType, t.time, date);
           fareSource = 'estimate';
         }
 
@@ -409,16 +424,16 @@ router.get('/', async (req, res) => {
         } catch {}
 
         return {
-          train:     t.train,
-          trainName: t.trainName,
-          trainType: t.trainType,
-          time:      t.time,
+          train:      t.train,
+          trainName:  t.trainName,
+          trainType:  t.trainType,
+          time:       t.time,
           arriveTime: t.arriveTime,
-          duration:  t.duration,
+          duration:   t.duration,
           price,
           fareSource,
-          trend:     t.trend || null,
-          delay:     aiDelay,
+          trend:      t.trend || null,
+          delay:      aiDelay,
         };
       })
     );

@@ -255,6 +255,45 @@ async function getWorkItems() {
   return work;
 }
 
+// Single-route live scrape for on-demand search fare freshness
+export async function scrapeFaresForSearch(origin, destination, dateStr) {
+  // HTTP attempt first (fast)
+  try {
+    const fares = await fetchFaresHttp(origin, destination, dateStr);
+    if (fares && fares.length > 0) {
+      await storeObservations(origin, destination, dateStr, fares, true);
+      console.log(`[LIVE FARE] HTTP ${origin}→${destination} ${dateStr}: ${fares.length} trains`);
+      return fares;
+    }
+  } catch (err) {
+    console.log(`[LIVE FARE] HTTP failed for ${origin}→${destination}: ${err.message}`);
+  }
+
+  // Puppeteer fallback
+  const pup = await loadPuppeteer();
+  if (!pup) return null;
+
+  let browser = null;
+  try {
+    browser = await pup.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote'],
+    });
+    const fares = await fetchFaresPuppeteer(browser, origin, destination, dateStr);
+    if (fares && fares.length > 0) {
+      await storeObservations(origin, destination, dateStr, fares, true);
+      console.log(`[LIVE FARE] Puppeteer ${origin}→${destination} ${dateStr}: ${fares.length} trains`);
+      return fares;
+    }
+  } catch (err) {
+    console.log(`[LIVE FARE] Puppeteer failed for ${origin}→${destination}: ${err.message}`);
+  } finally {
+    if (browser) try { await browser.close(); } catch {}
+  }
+  return null;
+}
+
+
 export async function scrapeFares() {
   const t0 = Date.now();
   console.log('[FARE SCRAPER] Starting fare collection run...');
