@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-const API_BASE = 'https://corridor-backend-production.up.railway.app';
+const API_BASE = 'https://api.corridor-app.com';
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────
 const C = {
