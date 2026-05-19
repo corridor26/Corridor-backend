@@ -1,7 +1,8 @@
-# System libraries required by Chromium at runtime (puppeteer uses bundled Chrome)
 # aptPkgs ADDS to Railway's default Node.js setup; nixPkgs replaces it (breaks npm)
+# chromium is installed here so PUPPETEER_SKIP_CHROMIUM_DOWNLOAD can skip the 170MB download
 [phases.setup]
 aptPkgs = [
+  "chromium",
   "libnss3",
   "libatk1.0-0",
   "libatk-bridge2.0-0",
@@ -24,3 +25,7 @@ aptPkgs = [
   "libgtk-3-0",
   "libxshmfence1"
 ]
+
+[variables]
+PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
+PUPPETEER_EXECUTABLE_PATH = "/usr/bin/chromium"
