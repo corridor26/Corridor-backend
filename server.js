@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import tripsRouter from './routes/trips.js';
 import searchRouter, { statusRouter } from './routes/search.js';
+import weatherRouter from './routes/weather.js';
 import { initializeScheduler, runScrapersOnStartup } from './scraper/scheduler.js';
 import pool from './config/database.js';
 import { runMigrations } from './scripts/migrate.js';
@@ -26,6 +27,7 @@ app.get('/health', (req, res) => {
 app.use('/api/trips', tripsRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/status', statusRouter);
+app.use('/api/weather', weatherRouter);
 
 // Database health check
 app.get('/api/db-health', async (req, res) => {

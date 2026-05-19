@@ -265,16 +265,34 @@ const TripsScreen = ({ onSelectTrip }) => {
 
 // ─── SCREEN: TRIP DETAIL ─────────────────────────────────────────
 const TripDetailScreen = ({ trip, onBack }) => {
+  const [detail, setDetail] = useState(null);
+  const [weather, setWeather] = useState(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/trips/${trip.id}`)
+      .then(r => r.json())
+      .then(setDetail)
+      .catch(() => {});
+
+    fetch(`${API_BASE}/api/weather/${trip.toCode}`)
+      .then(r => r.json())
+      .then(setWeather)
+      .catch(() => {});
+  }, [trip.id, trip.toCode]);
+
+  const d = detail || trip;
+  const stops = detail?.stops || [];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: C.paper }}>
       <div style={{ background: C.fieldBlue, padding: '36px 18px 12px' }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', ...MONO, fontSize: '10px', marginBottom: '10px', padding: 0 }}>← Back</button>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
           <div>
-            <div style={{ ...DISPLAY, fontSize: '22px', color: '#fff' }}>{trip.trainName} #{trip.number}</div>
-            <div style={{ ...MONO, fontSize: '8px', color: 'rgba(255,255,255,0.6)', marginTop: '3px' }}>{trip.fromCode} → {trip.toCode}</div>
+            <div style={{ ...DISPLAY, fontSize: '22px', color: '#fff' }}>{d.trainName} #{d.number}</div>
+            <div style={{ ...MONO, fontSize: '8px', color: 'rgba(255,255,255,0.6)', marginTop: '3px' }}>{d.fromCode} → {d.toCode}</div>
           </div>
-          <StatusBadge label={trip.statusLabel} type={trip.statusType} />
+          <StatusBadge label={d.statusLabel} type={d.statusType} />
         </div>
         <div style={{ height: '3px', background: C.chevronRed, marginTop: '12px', marginLeft: '-18px', marginRight: '-18px' }} />
       </div>
@@ -284,13 +302,13 @@ const TripDetailScreen = ({ trip, onBack }) => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight }}>
             <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '6px' }}>DEPARTURE</div>
-            <div style={{ ...MONO, fontSize: '24px', fontWeight: 'bold', color: C.ink }}>{trip.departure}</div>
-            <div style={{ ...BODY, fontSize: '10px', color: C.inkMid, marginTop: '6px' }}>{trip.fromName || trip.fromCode}</div>
+            <div style={{ ...MONO, fontSize: '24px', fontWeight: 'bold', color: C.ink }}>{d.departure}</div>
+            <div style={{ ...BODY, fontSize: '10px', color: C.inkMid, marginTop: '6px' }}>{d.fromName || d.fromCode}</div>
           </div>
           <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight }}>
             <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '6px' }}>ARRIVAL</div>
-            <div style={{ ...MONO, fontSize: '24px', fontWeight: 'bold', color: C.ink }}>{trip.arrival}</div>
-            <div style={{ ...BODY, fontSize: '10px', color: C.inkMid, marginTop: '6px' }}>{trip.toName || trip.toCode}</div>
+            <div style={{ ...MONO, fontSize: '24px', fontWeight: 'bold', color: C.ink }}>{d.arrival}</div>
+            <div style={{ ...BODY, fontSize: '10px', color: C.inkMid, marginTop: '6px' }}>{d.toName || d.toCode}</div>
           </div>
         </div>
 
@@ -300,23 +318,23 @@ const TripDetailScreen = ({ trip, onBack }) => {
             <div style={{ ...DISPLAY, fontSize: '9px', background: C.fieldBlue, color: '#fff', padding: '4px 8px', borderRadius: '4px' }}>AI</div>
             <div style={{ ...BODY, fontSize: '11px', color: C.fieldBlue, fontWeight: 600 }}>Predictive Delay Intelligence</div>
           </div>
-          <div style={{ ...MONO, fontSize: '20px', fontWeight: 'bold', color: trip.aiDelay > 0 ? C.orange : C.green, marginBottom: '8px' }}>
-            {trip.aiDelay === 0 ? 'On time' : `+${trip.aiDelay}m predicted`}
+          <div style={{ ...MONO, fontSize: '20px', fontWeight: 'bold', color: d.aiDelay > 0 ? C.orange : C.green, marginBottom: '8px' }}>
+            {d.aiDelay === 0 ? 'On time' : `+${d.aiDelay}m predicted`}
           </div>
-          <div style={{ ...MONO, fontSize: '8px', color: C.inkLight, marginBottom: '8px' }}>{trip.aiConfidence}% confidence</div>
+          <div style={{ ...MONO, fontSize: '8px', color: C.inkLight, marginBottom: '8px' }}>{d.aiConfidence}% confidence</div>
           <div style={{ ...ITALIC, fontSize: '10px', color: C.fieldBlue, lineHeight: 1.6 }}>
-            {trip.reasoning || 'Based on historical delay patterns for this route.'}
+            {d.reasoning || 'Based on historical delay patterns for this route.'}
           </div>
           <div style={{ ...MONO, fontSize: '8px', color: C.inkLight, marginTop: '8px' }}>Corridor AI Model</div>
         </div>
 
         {/* Live Location */}
-        {trip.currentLocation && (
+        {d.currentLocation && (
           <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.greenLight }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
               <div>
                 <div style={{ ...MONO, fontSize: '7px', color: C.green, letterSpacing: '0.14em', marginBottom: '4px' }}>LIVE POSITION</div>
-                <div style={{ ...BODY, fontSize: '12px', color: C.ink }}>{trip.currentLocation}</div>
+                <div style={{ ...BODY, fontSize: '12px', color: C.ink }}>{d.currentLocation}</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: C.green, borderRadius: '4px', padding: '4px 8px' }}>
                 <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#fff', animation: 'pulse 1.5s infinite' }} />
@@ -331,26 +349,21 @@ const TripDetailScreen = ({ trip, onBack }) => {
           <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.rule}`, background: C.paperDark }}>
             <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em' }}>ROUTE & STOPS</div>
           </div>
-          {[
-            { name: 'New York Penn', code: 'NYP', sched: '07:05', actual: '07:05', passed: true },
-            { name: 'Newark', code: 'NWK', sched: '07:24', actual: '07:26', passed: true },
-            { name: 'Philadelphia', code: 'PHL', sched: '08:10', actual: '08:09', passed: true },
-            { name: 'Wilmington', code: 'WIL', sched: '08:31', actual: null, passed: false },
-            { name: 'Baltimore', code: 'BAL', sched: '09:05', actual: null, passed: false },
-            { name: 'Washington Union', code: 'WAS', sched: '09:42', actual: null, passed: false },
-          ].map((stop, i) => (
-            <div key={i} style={{ padding: '12px 14px', borderBottom: i < 5 ? `1px solid ${C.rule}` : 'none', display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {stops.length === 0 ? (
+            <div style={{ padding: '16px', ...MONO, fontSize: '9px', color: C.inkLight, textAlign: 'center' }}>Loading stops…</div>
+          ) : stops.map((stop, i) => (
+            <div key={i} style={{ padding: '12px 14px', borderBottom: i < stops.length - 1 ? `1px solid ${C.rule}` : 'none', display: 'flex', gap: '10px', alignItems: 'center' }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: stop.passed ? C.fieldBlue : C.rule, flexShrink: 0 }} />
-                {i < 5 && <div style={{ width: '2px', height: '18px', background: stop.passed ? C.fieldBlue : C.rule }} />}
+                {i < stops.length - 1 && <div style={{ width: '2px', height: '18px', background: stop.passed ? C.fieldBlue : C.rule }} />}
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ ...BODY, fontSize: '11px', color: C.ink }}>{stop.name}</div>
                 <div style={{ ...MONO, fontSize: '8px', color: C.inkLight }}>{stop.code}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ ...MONO, fontSize: '12px', fontWeight: 'bold', color: C.ink }}>{stop.sched}</div>
-                {stop.actual && <div style={{ ...MONO, fontSize: '8px', color: stop.actual > stop.sched ? C.orange : C.green }}>{stop.actual} actual</div>}
+                <div style={{ ...MONO, fontSize: '12px', fontWeight: 'bold', color: C.ink }}>{stop.schTime}</div>
+                {stop.actTime && <div style={{ ...MONO, fontSize: '8px', color: stop.actTime > stop.schTime ? C.orange : C.green }}>{stop.actTime} actual</div>}
               </div>
             </div>
           ))}
@@ -360,9 +373,9 @@ const TripDetailScreen = ({ trip, onBack }) => {
         <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight }}>
           <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '12px' }}>TYPICAL DELAYS ON THIS ROUTE</div>
           {[
-            { range: '<10 min', percent: trip.delayDistribution?.['<10min'] || 50, color: C.green },
-            { range: '10-30 min', percent: trip.delayDistribution?.['10-30min'] || 25, color: C.orange },
-            { range: '30+ min', percent: trip.delayDistribution?.['30+min'] || 25, color: C.red },
+            { range: '<10 min', percent: d.delayDistribution?.['<10min'] || 50, color: C.green },
+            { range: '10-30 min', percent: d.delayDistribution?.['10-30min'] || 25, color: C.orange },
+            { range: '30+ min', percent: d.delayDistribution?.['30+min'] || 25, color: C.red },
           ].map((item, i) => (
             <div key={i} style={{ marginBottom: i < 2 ? '12px' : '0' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', ...MONO, fontSize: '9px', color: C.ink, marginBottom: '5px' }}>
@@ -381,11 +394,11 @@ const TripDetailScreen = ({ trip, onBack }) => {
           <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '10px' }}>RECENT DELAYS (PAST 3H)</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ ...BODY, fontSize: '11px', color: C.ink }}>{trip.direction || 'Southbound'} direction</div>
+              <div style={{ ...BODY, fontSize: '11px', color: C.ink }}>{d.direction || 'Southbound'} direction</div>
               <div style={{ ...MONO, fontSize: '8px', color: C.inkLight, marginTop: '3px' }}>4 trains sampled</div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ ...MONO, fontSize: '18px', fontWeight: 'bold', color: trip.recentAvgDelay > 10 ? C.orange : C.green }}>+{trip.recentAvgDelay} min</div>
+              <div style={{ ...MONO, fontSize: '18px', fontWeight: 'bold', color: (d.recentAvgDelay || 0) > 10 ? C.orange : C.green }}>+{d.recentAvgDelay || 0} min</div>
               <div style={{ ...MONO, fontSize: '8px', color: C.inkLight, marginTop: '3px' }}>avg delay</div>
             </div>
           </div>
@@ -396,10 +409,10 @@ const TripDetailScreen = ({ trip, onBack }) => {
           <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '10px' }}>WEATHER AT DESTINATION</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ ...BODY, fontSize: '11px', color: C.ink }}>{trip.toName || trip.toCode}</div>
-              <div style={{ ...MONO, fontSize: '8px', color: C.inkLight, marginTop: '3px' }}>Cloudy</div>
+              <div style={{ ...BODY, fontSize: '11px', color: C.ink }}>{weather?.station || d.toName || d.toCode}</div>
+              <div style={{ ...MONO, fontSize: '8px', color: C.inkLight, marginTop: '3px' }}>{weather ? weather.condition : '—'}</div>
             </div>
-            <div style={{ ...MONO, fontSize: '28px', fontWeight: 'bold', color: C.ink }}>38°</div>
+            <div style={{ ...MONO, fontSize: '28px', fontWeight: 'bold', color: C.ink }}>{weather ? `${weather.temp}°` : '—'}</div>
           </div>
         </div>
 
@@ -425,15 +438,15 @@ const TripDetailScreen = ({ trip, onBack }) => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
             <div style={{ background: C.paperDark, borderRadius: '4px', padding: '10px' }}>
               <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '4px' }}>CURRENT</div>
-              <div style={{ ...MONO, fontSize: '14px', fontWeight: 'bold', color: C.fieldBlue }}>$49</div>
+              <div style={{ ...MONO, fontSize: '14px', fontWeight: 'bold', color: C.fieldBlue }}>{detail?.currentPrice ? `$${detail.currentPrice}` : '—'}</div>
             </div>
             <div style={{ background: C.paperDark, borderRadius: '4px', padding: '10px' }}>
               <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '4px' }}>24H HIGH</div>
-              <div style={{ ...MONO, fontSize: '14px', fontWeight: 'bold', color: C.ink }}>$65</div>
+              <div style={{ ...MONO, fontSize: '14px', fontWeight: 'bold', color: C.ink }}>{detail?.high24h ? `$${detail.high24h}` : '—'}</div>
             </div>
             <div style={{ background: C.paperDark, borderRadius: '4px', padding: '10px' }}>
               <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '4px' }}>24H LOW</div>
-              <div style={{ ...MONO, fontSize: '14px', fontWeight: 'bold', color: C.green }}>$35</div>
+              <div style={{ ...MONO, fontSize: '14px', fontWeight: 'bold', color: C.green }}>{detail?.low24h ? `$${detail.low24h}` : '—'}</div>
             </div>
           </div>
         </div>
