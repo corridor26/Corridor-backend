@@ -15,17 +15,18 @@ const C = {
   fieldBlueLightTint: '#e4eef8',
   green: '#1a4d2a',
   greenLight: '#e4f0e8',
+  successGreen: '#2e7d32',
   orange: '#7a3800',
   orangeLight: '#f2e8d8',
   red: '#b01818',
   redLight: '#f7e4e4',
-  chevronRed: '#c8281e',
+  chevronRed: '#d32f2f',
   rule: '#d8d0c4',
   ruleStrong: '#8a9db8',
 };
 
-const DISPLAY = { fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' };
-const BODY = { fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600 };
+const DISPLAY = { fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' };
+const BODY = { fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, lineHeight: 1.6 };
 const MONO = { fontFamily: "'Courier New', monospace" };
 const ITALIC = { fontFamily: "'Georgia', serif", fontStyle: 'italic' };
 
@@ -79,9 +80,9 @@ const ScreenHeader = ({ subtitle, isPrimary = true }) => (
 // ─── STATUS BADGE ────────────────────────────────────────────────
 const StatusBadge = ({ label, type }) => {
   const styles = {
-    'ON TIME': { bg: C.greenLight, text: C.green },
-    'DELAYED': { bg: C.orangeLight, text: C.orange },
-    'CANCELLED': { bg: C.redLight, text: C.red },
+    'ON TIME':   { bg: C.greenLight,  text: C.green  },
+    'DELAYED':   { bg: C.orangeLight, text: C.orange },
+    'CANCELLED': { bg: C.redLight,    text: C.red    },
   };
   const s = styles[label] || styles['ON TIME'];
   return (
@@ -91,7 +92,7 @@ const StatusBadge = ({ label, type }) => {
       letterSpacing: '0.06em',
       background: s.bg,
       color: s.text,
-      border: `1px solid ${s.text}55`,
+      border: `1.5px solid ${s.text}`,
       borderRadius: '4px',
       padding: '3px 8px',
       display: 'inline-block',
@@ -109,19 +110,16 @@ const TripProgressBar = ({ progress }) => (
       <div style={{ position: 'absolute', height: '2px', background: C.fieldBlue, width: `${progress * 100}%`, borderRadius: '1px', left: 0 }} />
     )}
     {progress > 0 && (
-      <div
-        style={{
-          position: 'absolute',
-          left: `${progress * 100}%`,
-          width: '10px',
-          height: '10px',
-          borderRadius: '50%',
-          background: C.fieldBlue,
-          border: `2px solid ${C.paperLight}`,
-          transform: 'translateX(-50%)',
-          animation: 'pulse 2.5s ease-in-out infinite',
-        }}
-      />
+      <div style={{
+        position: 'absolute',
+        left: `${progress * 100}%`,
+        width: '10px', height: '10px',
+        borderRadius: '50%',
+        background: C.fieldBlue,
+        border: `2px solid ${C.paperLight}`,
+        transform: 'translateX(-50%)',
+        animation: 'pulse 2.5s ease-in-out infinite',
+      }} />
     )}
     {progress === 0 && (
       <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', ...MONO, fontSize: '8px', color: C.inkLight, letterSpacing: '0.1em' }}>– – –</div>
@@ -131,51 +129,57 @@ const TripProgressBar = ({ progress }) => (
 
 // ─── TRIP CARD ───────────────────────────────────────────────────
 const TripCard = ({ trip, onClick }) => {
+  const [hovered, setHovered] = useState(false);
   const accentColor = trip.statusType === 'ontime' ? C.fieldBlue : trip.statusType === 'cancelled' ? C.red : C.orange;
+  const bg = hovered ? '#f5f3f0' : '#fafbfd';
 
   return (
     <div
       onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         border: `1px solid ${C.ruleStrong}`,
         borderLeft: `4px solid ${accentColor}`,
         borderRadius: '6px',
         overflow: 'hidden',
         cursor: 'pointer',
-        background: C.paperLight,
+        background: bg,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+        transition: 'background 0.15s',
       }}
     >
-      <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.rule}`, background: C.paperLight }}>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid #e0dcd5', background: bg }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ ...DISPLAY, fontSize: '16px', color: C.ink }}>{trip.trainName}</span>
               <span style={{ ...MONO, fontSize: '10px', color: C.inkLight }}>{trip.number}</span>
             </div>
-            <div style={{ ...ITALIC, fontSize: '9px', color: C.inkLight, marginTop: '2px' }}>{trip.date}</div>
+            <div style={{ ...ITALIC, fontSize: '9px', color: C.inkLight, marginTop: '12px' }}>{trip.date}</div>
           </div>
           <StatusBadge label={trip.statusLabel} type={trip.statusType} />
         </div>
       </div>
 
-      <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.rule}`, background: C.paperLight }}>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid #e0dcd5', background: bg }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{ minWidth: '50px' }}>
             <div style={{ ...MONO, fontSize: '22px', fontWeight: 'bold', color: C.ink }}>{trip.departure}</div>
-            <div style={{ ...BODY, fontSize: '10px', color: C.inkMid, marginTop: '3px' }}>{trip.fromCode}</div>
+            <div style={{ ...BODY, fontSize: '12px', color: C.inkMid, marginTop: '3px' }}>{trip.fromCode}</div>
           </div>
           <div style={{ flex: 1 }}>
             <TripProgressBar progress={trip.progress} />
           </div>
           <div style={{ minWidth: '50px', textAlign: 'right' }}>
             <div style={{ ...MONO, fontSize: '22px', fontWeight: 'bold', color: trip.statusType === 'cancelled' ? C.red : C.ink }}>{trip.arrival}</div>
-            <div style={{ ...BODY, fontSize: '10px', color: C.inkMid, marginTop: '3px' }}>{trip.toCode}</div>
+            <div style={{ ...BODY, fontSize: '12px', color: C.inkMid, marginTop: '3px' }}>{trip.toCode}</div>
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', background: C.paperDark, borderBottom: `1px solid ${C.rule}` }}>
-        <div style={{ padding: '12px 14px', borderRight: `1px solid ${C.rule}` }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', background: C.paperDark, borderBottom: '1px solid #e0dcd5' }}>
+        <div style={{ padding: '12px 14px', borderRight: '1px solid #e0dcd5' }}>
           <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '6px' }}>TRACK</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: trip.trackStatus === 'confirmed' ? C.green : C.orange }} />
@@ -186,12 +190,12 @@ const TripCard = ({ trip, onClick }) => {
           </div>
         </div>
 
-        <div style={{ padding: '12px 14px', borderRight: `1px solid ${C.rule}` }}>
+        <div style={{ padding: '12px 14px', borderRight: '1px solid #e0dcd5' }}>
           <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '6px' }}>AI DELAY</div>
           <div style={{ ...MONO, fontSize: '15px', fontWeight: 'bold', color: trip.aiDelay > 0 ? C.orange : C.green }}>
             {trip.aiDelay === 0 ? 'On time' : `+${trip.aiDelay}m`}
           </div>
-          <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, marginTop: '3px' }}>{trip.aiConfidence}% conf.</div>
+          <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, marginTop: '3px' }}>{trip.aiConfidence || 72}% conf.</div>
         </div>
 
         <div style={{ padding: '12px 14px' }}>
@@ -205,7 +209,7 @@ const TripCard = ({ trip, onClick }) => {
         </div>
       </div>
 
-      <div style={{ padding: '10px 16px', background: trip.statusType === 'cancelled' ? C.redLight : C.paperLight, display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <div style={{ padding: '10px 16px', background: trip.statusType === 'cancelled' ? C.redLight : bg, display: 'flex', alignItems: 'center', gap: '6px' }}>
         <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: trip.recentAvgDelay > 10 ? C.orange : C.green, flexShrink: 0 }} />
         <div style={{ ...MONO, fontSize: '9px', color: C.inkMid, flex: 1 }}>
           {trip.statusType === 'cancelled' ? 'Train cancelled · 3 alternatives' : `+${trip.recentAvgDelay} min avg · ${trip.direction}`}
@@ -232,11 +236,12 @@ const TripsScreen = ({ onSelectTrip }) => {
           number: t.trainNumber,
           rawDate: t.date,
           date: formatDate(t.date),
+          aiConfidence: t.aiConfidence || 72,
         }));
         setTrips(mapped);
         setLoading(false);
       })
-      .catch(err => {
+      .catch(() => {
         setError('Could not load trips');
         setLoading(false);
       });
@@ -245,7 +250,7 @@ const TripsScreen = ({ onSelectTrip }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: C.paper }}>
       <ScreenHeader subtitle="UPCOMING TRIPS" isPrimary />
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '80px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '80px' }}>
         {loading && (
           <div style={{ ...MONO, fontSize: '10px', color: C.inkLight, textAlign: 'center', marginTop: '40px' }}>Loading trips...</div>
         )}
@@ -285,7 +290,7 @@ const TripDetailScreen = ({ trip, onBack }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: C.paper }}>
-      <div style={{ background: C.fieldBlue, padding: '36px 18px 12px' }}>
+      <div style={{ background: C.fieldBlue, padding: '36px 18px 0' }}>
         <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', ...MONO, fontSize: '10px', marginBottom: '10px', padding: 0 }}>← Back</button>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
           <div>
@@ -294,18 +299,18 @@ const TripDetailScreen = ({ trip, onBack }) => {
           </div>
           <StatusBadge label={d.statusLabel} type={d.statusType} />
         </div>
-        <div style={{ height: '3px', background: C.chevronRed, marginTop: '12px', marginLeft: '-18px', marginRight: '-18px' }} />
+        <div style={{ height: '3px', background: C.chevronRed, marginTop: '20px', marginLeft: '-18px', marginRight: '-18px' }} />
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '80px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '80px' }}>
         {/* Times */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight }}>
+          <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '6px' }}>DEPARTURE</div>
             <div style={{ ...MONO, fontSize: '24px', fontWeight: 'bold', color: C.ink }}>{d.departure}</div>
             <div style={{ ...BODY, fontSize: '10px', color: C.inkMid, marginTop: '6px' }}>{d.fromName || d.fromCode}</div>
           </div>
-          <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight }}>
+          <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
             <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '6px' }}>ARRIVAL</div>
             <div style={{ ...MONO, fontSize: '24px', fontWeight: 'bold', color: C.ink }}>{d.arrival}</div>
             <div style={{ ...BODY, fontSize: '10px', color: C.inkMid, marginTop: '6px' }}>{d.toName || d.toCode}</div>
@@ -313,7 +318,7 @@ const TripDetailScreen = ({ trip, onBack }) => {
         </div>
 
         {/* AI Prediction */}
-        <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.fieldBlueLightTint }}>
+        <div style={{ border: `1px solid ${C.ruleStrong}`, borderLeft: `4px solid ${C.fieldBlue}`, borderRadius: '6px', padding: '18px', background: C.fieldBlueLightTint, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
             <div style={{ ...DISPLAY, fontSize: '9px', background: C.fieldBlue, color: '#fff', padding: '4px 8px', borderRadius: '4px' }}>AI</div>
             <div style={{ ...BODY, fontSize: '11px', color: C.fieldBlue, fontWeight: 600 }}>Predictive Delay Intelligence</div>
@@ -321,7 +326,7 @@ const TripDetailScreen = ({ trip, onBack }) => {
           <div style={{ ...MONO, fontSize: '20px', fontWeight: 'bold', color: d.aiDelay > 0 ? C.orange : C.green, marginBottom: '8px' }}>
             {d.aiDelay === 0 ? 'On time' : `+${d.aiDelay}m predicted`}
           </div>
-          <div style={{ ...MONO, fontSize: '8px', color: C.inkLight, marginBottom: '8px' }}>{d.aiConfidence}% confidence</div>
+          <div style={{ ...MONO, fontSize: '8px', color: C.inkLight, marginBottom: '8px' }}>{d.aiConfidence || 72}% confidence</div>
           <div style={{ ...ITALIC, fontSize: '10px', color: C.fieldBlue, lineHeight: 1.6 }}>
             {d.reasoning || 'Based on historical delay patterns for this route.'}
           </div>
@@ -344,8 +349,8 @@ const TripDetailScreen = ({ trip, onBack }) => {
           </div>
         )}
 
-        {/* Route */}
-        <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', overflow: 'hidden', background: C.paperLight }}>
+        {/* Route & Stops */}
+        <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', overflow: 'hidden', background: C.paperLight, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.rule}`, background: C.paperDark }}>
             <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em' }}>ROUTE & STOPS</div>
           </div>
@@ -358,7 +363,7 @@ const TripDetailScreen = ({ trip, onBack }) => {
                 {i < stops.length - 1 && <div style={{ width: '2px', height: '18px', background: stop.passed ? C.fieldBlue : C.rule }} />}
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ ...BODY, fontSize: '11px', color: C.ink }}>{stop.name}</div>
+                <div style={{ ...BODY, fontSize: '12px', color: C.ink }}>{stop.name}</div>
                 <div style={{ ...MONO, fontSize: '8px', color: C.inkLight }}>{stop.code}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -370,27 +375,29 @@ const TripDetailScreen = ({ trip, onBack }) => {
         </div>
 
         {/* Delay Distribution */}
-        <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight }}>
+        <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '12px' }}>TYPICAL DELAYS ON THIS ROUTE</div>
           {[
-            { range: '<10 min', percent: d.delayDistribution?.['<10min'] || 50, color: C.green },
+            { range: '<10 min',  percent: d.delayDistribution?.['<10min']   || 50, color: C.green  },
             { range: '10-30 min', percent: d.delayDistribution?.['10-30min'] || 25, color: C.orange },
-            { range: '30+ min', percent: d.delayDistribution?.['30+min'] || 25, color: C.red },
+            { range: '30+ min',  percent: d.delayDistribution?.['30+min']   || 25, color: C.red    },
           ].map((item, i) => (
             <div key={i} style={{ marginBottom: i < 2 ? '12px' : '0' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', ...MONO, fontSize: '9px', color: C.ink, marginBottom: '5px' }}>
-                <span>{item.range}</span>
-                <span style={{ color: C.inkLight }}>{item.percent}%</span>
-              </div>
-              <div style={{ width: '100%', height: '8px', background: C.paperDark, borderRadius: '2px', overflow: 'hidden' }}>
-                <div style={{ width: `${item.percent}%`, height: '100%', background: item.color }} />
+              <div style={{ ...MONO, fontSize: '9px', color: C.ink, marginBottom: '5px' }}>{item.range}</div>
+              <div style={{ position: 'relative', width: '100%', height: '14px', background: C.paperDark, borderRadius: '2px', overflow: 'hidden' }}>
+                <div style={{ width: `${item.percent}%`, height: '100%', background: item.color, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '4px', boxSizing: 'border-box' }}>
+                  {item.percent >= 15 && <span style={{ ...MONO, fontSize: '7px', color: '#fff', fontWeight: 'bold' }}>{item.percent}%</span>}
+                </div>
+                {item.percent < 15 && (
+                  <span style={{ position: 'absolute', left: `${item.percent + 2}%`, top: '50%', transform: 'translateY(-50%)', ...MONO, fontSize: '7px', color: C.inkMid }}>{item.percent}%</span>
+                )}
               </div>
             </div>
           ))}
         </div>
 
         {/* Recent Delays */}
-        <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight }}>
+        <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '10px' }}>RECENT DELAYS (PAST 3H)</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
@@ -405,7 +412,7 @@ const TripDetailScreen = ({ trip, onBack }) => {
         </div>
 
         {/* Weather */}
-        <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight }}>
+        <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '10px' }}>WEATHER AT DESTINATION</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
@@ -417,7 +424,7 @@ const TripDetailScreen = ({ trip, onBack }) => {
         </div>
 
         {/* Fare History */}
-        <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight }}>
+        <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '12px' }}>FARE HISTORY (24H)</div>
 
           <svg width="100%" height="80" style={{ marginBottom: '12px', background: C.paperDark, borderRadius: '4px', padding: '8px 6px', boxSizing: 'border-box' }} viewBox="0 0 340 80" preserveAspectRatio="xMidYMid meet">
@@ -453,6 +460,7 @@ const TripDetailScreen = ({ trip, onBack }) => {
 
         <button
           onClick={() => window.open(buildAmtrakUrl(trip.fromCode, trip.toCode, trip.rawDate || today()), '_blank')}
+          className="book-btn"
           style={{
             width: '100%',
             ...DISPLAY,
@@ -463,9 +471,9 @@ const TripDetailScreen = ({ trip, onBack }) => {
             background: C.fieldBlue,
             color: '#fff',
             cursor: 'pointer',
-            letterSpacing: '0.05em',
+            letterSpacing: '0.06em',
           }}>
-          Book on Amtrak →
+          Book on Amtrak <span style={{ fontSize: '1.2em' }}>→</span>
         </button>
       </div>
     </div>
@@ -503,7 +511,6 @@ const BookingScreen = ({ onSaved }) => {
   };
 
   const isSameDay = () => date === today();
-
   const getOfficialStatusColor = (status) => status === 'On time' ? C.green : C.orange;
   const getDelayColor = (delay) => delay === 0 ? C.green : delay <= 10 ? C.orange : C.red;
 
@@ -521,10 +528,9 @@ const BookingScreen = ({ onSaved }) => {
         avgDelay: r.delay ?? 0,
         officialStatus: (r.delay ?? 0) === 0 ? 'On time' : `+${r.delay}m delayed`,
         aiDelay: r.delay ?? 0,
-        aiConfidence: 75,
+        aiConfidence: r.aiConfidence || 75,
         priceHigh: Math.round(r.price * 1.2),
         priceLow: Math.round(r.price * 0.85),
-        priceIntel: r.price < 70 ? 'Good value · Near 24h low' : r.price < 90 ? 'Typical price · Wait for drop' : 'Price elevated · Buy if flexible',
       }));
       setSearchResults(mapped);
     } catch {
@@ -536,25 +542,31 @@ const BookingScreen = ({ onSaved }) => {
   const results = searchResults ?? [];
   const hasResults = results.length > 0;
 
+  const selectStyle = {
+    width: '100%', ...MONO, fontSize: '13px', fontWeight: 'bold',
+    padding: '8px 10px', borderRadius: '6px',
+    border: `1px solid ${C.rule}`, background: C.paperDark, color: C.ink, cursor: 'pointer',
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: C.paper }}>
       <ScreenHeader subtitle="SEARCH & BOOK" isPrimary />
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '80px' }}>
-        <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '16px', background: C.paperLight }}>
-          <div style={{ ...DISPLAY, fontSize: '11px', color: C.ink, marginBottom: '12px', letterSpacing: '0.04em' }}>Find a Train</div>
+        <div style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '20px', background: C.paperLight, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+          <div style={{ ...DISPLAY, fontSize: '11px', color: C.ink, marginBottom: '12px' }}>Find a Train</div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '8px', marginBottom: '12px', alignItems: 'flex-end' }}>
             <div>
               <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '6px' }}>FROM</div>
-              <select value={from} onChange={(e) => setFrom(e.target.value)} style={{ width: '100%', ...MONO, fontSize: '13px', fontWeight: 'bold', padding: '8px 10px', borderRadius: '4px', border: `1px solid ${C.rule}`, background: C.paperDark, color: C.ink, cursor: 'pointer' }}>
+              <select value={from} onChange={(e) => setFrom(e.target.value)} className="corridor-select" style={selectStyle}>
                 {['NYP', 'WAS', 'PHL', 'BOS', 'BAL'].map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
-            <button onClick={() => { setFrom(to); setTo(from); }} style={{ background: 'none', border: 'none', ...MONO, fontSize: '12px', color: C.fieldBlue, cursor: 'pointer' }}>⇄</button>
+            <button onClick={() => { setFrom(to); setTo(from); }} title="Swap stations" style={{ background: 'none', border: 'none', ...MONO, fontSize: '14px', color: C.fieldBlue, cursor: 'pointer' }}>⇄</button>
             <div>
               <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '6px' }}>TO</div>
-              <select value={to} onChange={(e) => setTo(e.target.value)} style={{ width: '100%', ...MONO, fontSize: '13px', fontWeight: 'bold', padding: '8px 10px', borderRadius: '4px', border: `1px solid ${C.rule}`, background: C.paperDark, color: C.ink, cursor: 'pointer' }}>
+              <select value={to} onChange={(e) => setTo(e.target.value)} className="corridor-select" style={selectStyle}>
                 {['WAS', 'NYP', 'PHL', 'BOS', 'BAL'].map(c => <option key={c}>{c}</option>)}
               </select>
             </div>
@@ -562,101 +574,115 @@ const BookingScreen = ({ onSaved }) => {
 
           <div style={{ marginBottom: '12px' }}>
             <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '6px' }}>DATE</div>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: '100%', ...MONO, fontSize: '13px', fontWeight: 'bold', padding: '8px 10px', borderRadius: '4px', border: `1px solid ${C.rule}`, background: C.paperDark, color: C.ink, cursor: 'pointer' }} />
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              style={{ width: '100%', ...MONO, fontSize: '14px', fontWeight: 'bold', padding: '8px 10px', borderRadius: '6px', border: `1px solid ${C.rule}`, background: C.paperDark, color: C.ink, cursor: 'pointer', boxSizing: 'border-box' }}
+            />
           </div>
 
-          <button onClick={handleSearch} disabled={searching} style={{ width: '100%', ...DISPLAY, fontSize: '9px', padding: '12px', borderRadius: '4px', border: 'none', background: searching ? C.inkLight : C.fieldBlue, color: '#fff', cursor: searching ? 'default' : 'pointer', letterSpacing: '0.05em' }}>
+          <button
+            onClick={handleSearch}
+            disabled={searching}
+            className="book-btn"
+            style={{ width: '100%', ...DISPLAY, fontSize: '9px', padding: '12px', borderRadius: '6px', border: 'none', background: searching ? C.inkLight : C.fieldBlue, color: '#fff', cursor: searching ? 'default' : 'pointer' }}>
             {searching ? 'Searching...' : 'Search Trains'}
           </button>
         </div>
 
         {searchResults !== null && (
-          <div>
-            <div style={{ ...DISPLAY, fontSize: '9px', color: C.inkLight, letterSpacing: '0.04em', marginBottom: '10px' }}>
+          <div style={{ marginTop: '12px' }}>
+            <div style={{ ...DISPLAY, fontSize: '9px', color: C.ink, marginBottom: '10px' }}>
               {hasResults ? 'Available Options' : 'No trains found for this route/date'}
             </div>
-            {results.map((result) => (
-              <div key={result.id} style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight, marginBottom: '10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                  <div style={{ ...DISPLAY, fontSize: '14px', color: C.ink }}>Train #{result.train}</div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ ...MONO, fontSize: '18px', fontWeight: 'bold', color: C.fieldBlue }}>${result.price}</div>
-                    <div style={{ ...MONO, fontSize: '8px', color: C.inkLight }}>Best fare</div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-                  <div>
-                    <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em' }}>DEPART</div>
-                    <div style={{ ...MONO, fontSize: '13px', fontWeight: 'bold', color: C.ink }}>{result.time}</div>
-                  </div>
-                  <div>
-                    <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em' }}>ARRIVE</div>
-                    <div style={{ ...MONO, fontSize: '13px', fontWeight: 'bold', color: C.ink }}>{result.arrival}</div>
-                  </div>
-                  {isSameDay() ? (
-                    <div>
-                      <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em' }}>OFFICIAL STATUS</div>
-                      <div style={{ ...MONO, fontSize: '13px', fontWeight: 'bold', color: getOfficialStatusColor(result.officialStatus) }}>{result.officialStatus}</div>
+            {results.map((result) => {
+              const isGoodValue = result.price <= (result.priceHigh + result.priceLow) / 2;
+              return (
+                <div key={result.id} style={{ border: `1px solid ${C.ruleStrong}`, borderRadius: '6px', padding: '14px', background: C.paperLight, marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{ ...DISPLAY, fontSize: '18px', color: C.ink }}>Train #{result.train}</div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ ...MONO, fontSize: '18px', fontWeight: 'bold', color: C.fieldBlue }}>${result.price}</div>
+                      <div style={{ ...MONO, fontSize: '8px', color: C.inkLight }}>Best fare</div>
                     </div>
-                  ) : (
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
                     <div>
-                      <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em' }}>AVG. DELAY</div>
-                      <div style={{ ...MONO, fontSize: '13px', fontWeight: 'bold', color: getDelayColor(result.avgDelay) }}>{result.avgDelay === 0 ? 'On time' : `+${result.avgDelay}m`}</div>
+                      <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em' }}>DEPART</div>
+                      <div style={{ ...MONO, fontSize: '13px', fontWeight: 'bold', color: C.ink }}>{result.time}</div>
+                    </div>
+                    <div>
+                      <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em' }}>ARRIVE</div>
+                      <div style={{ ...MONO, fontSize: '13px', fontWeight: 'bold', color: C.ink }}>{result.arrival}</div>
+                    </div>
+                    {isSameDay() ? (
+                      <div>
+                        <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em' }}>STATUS</div>
+                        <div style={{ ...MONO, fontSize: '13px', fontWeight: 'bold', color: getOfficialStatusColor(result.officialStatus) }}>{result.officialStatus}</div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em' }}>AVG. DELAY</div>
+                        <div style={{ ...MONO, fontSize: '13px', fontWeight: 'bold', color: getDelayColor(result.avgDelay) }}>{result.avgDelay === 0 ? 'On time' : `+${result.avgDelay}m`}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {isSameDay() && (
+                    <div style={{ marginBottom: '12px', padding: '10px', background: C.fieldBlueLightTint, borderRadius: '4px' }}>
+                      <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '4px' }}>AI DELAY PREDICTION</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ ...MONO, fontSize: '13px', fontWeight: 'bold', color: getDelayColor(result.aiDelay) }}>{result.aiDelay === 0 ? 'On time' : `+${result.aiDelay}m predicted`}</div>
+                        <div style={{ ...MONO, fontSize: '8px', color: C.inkLight }}>{result.aiConfidence}% conf.</div>
+                      </div>
                     </div>
                   )}
-                </div>
 
-                {isSameDay() && (
-                  <div style={{ marginBottom: '12px', padding: '10px', background: C.fieldBlueLightTint, borderRadius: '4px' }}>
-                    <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em', marginBottom: '4px' }}>AI DELAY PREDICTION</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ ...MONO, fontSize: '13px', fontWeight: 'bold', color: getDelayColor(result.aiDelay) }}>{result.aiDelay === 0 ? 'On time' : `+${result.aiDelay}m predicted`}</div>
-                      <div style={{ ...MONO, fontSize: '8px', color: C.inkLight }}>{result.aiConfidence}% conf.</div>
+                  <div style={{ marginBottom: '12px', padding: '10px', background: C.paperDark, borderRadius: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                      <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em' }}>24H PRICE TREND</div>
+                      <div style={{ ...DISPLAY, fontSize: '8px', padding: '3px 8px', borderRadius: '4px', background: C.greenLight, color: C.green }}>
+                        {result.price <= result.priceLow * 1.1 ? 'Great Value' : isGoodValue ? 'Good Value' : 'Fair Value'}
+                      </div>
+                    </div>
+                    <svg width="100%" height="80" viewBox="0 0 300 80" preserveAspectRatio="xMidYMid meet" style={{ marginBottom: '8px' }}>
+                      <defs>
+                        <linearGradient id={`priceGradient${result.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" style={{ stopColor: C.fieldBlue, stopOpacity: 0.15 }} />
+                          <stop offset="100%" style={{ stopColor: C.fieldBlue, stopOpacity: 0 }} />
+                        </linearGradient>
+                      </defs>
+                      <line x1="15" y1="65" x2="285" y2="65" stroke={C.rule} strokeWidth="0.5" opacity="0.5" />
+                      <line x1="15" y1="40" x2="285" y2="40" stroke={C.rule} strokeWidth="0.5" opacity="0.5" />
+                      <line x1="15" y1="15" x2="285" y2="15" stroke={C.rule} strokeWidth="0.5" opacity="0.5" />
+                      <path d="M 15 65 L 35 60 L 55 54 L 75 48 L 95 42 L 115 35 L 135 28 L 155 35 L 175 42 L 195 48 L 215 54 L 235 60 L 255 65 L 275 68 L 285 68 L 285 75 L 15 75 Z" fill={`url(#priceGradient${result.id})`} />
+                      <polyline points="15,65 35,60 55,54 75,48 95,42 115,35 135,28 155,35 175,42 195,48 215,54 235,60 255,65 275,68" fill="none" stroke={C.fieldBlue} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="275" cy="68" r="2.5" fill={C.fieldBlue} stroke={C.paperDark} strokeWidth="1.5" />
+                    </svg>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', ...MONO, fontSize: '8px', color: C.inkLight }}>
+                      <span>${result.priceLow}</span>
+                      <span style={{ fontWeight: 'bold', color: C.fieldBlue }}>${result.price}</span>
+                      <span>${result.priceHigh}</span>
                     </div>
                   </div>
-                )}
 
-                <div style={{ marginBottom: '12px', padding: '10px', background: C.paperDark, borderRadius: '4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                    <div style={{ ...MONO, fontSize: '7px', color: C.inkLight, letterSpacing: '0.14em' }}>24H PRICE TREND</div>
-                    <div style={{ ...DISPLAY, fontSize: '8px', padding: '3px 8px', borderRadius: '4px', background: result.price <= result.priceLow * 1.1 ? C.greenLight : result.price <= (result.priceHigh + result.priceLow) / 2 ? C.orangeLight : C.redLight, color: result.price <= result.priceLow * 1.1 ? C.green : result.price <= (result.priceHigh + result.priceLow) / 2 ? C.orange : C.red }}>
-                      {result.price <= result.priceLow * 1.1 ? 'Great Value' : result.price <= (result.priceHigh + result.priceLow) / 2 ? 'Good Value' : 'Poor Value'}
-                    </div>
-                  </div>
-                  <svg width="100%" height="60" viewBox="0 0 300 60" preserveAspectRatio="xMidYMid meet" style={{ marginBottom: '8px' }}>
-                    <defs>
-                      <linearGradient id={`priceGradient${result.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" style={{ stopColor: C.fieldBlue, stopOpacity: 0.15 }} />
-                        <stop offset="100%" style={{ stopColor: C.fieldBlue, stopOpacity: 0 }} />
-                      </linearGradient>
-                    </defs>
-                    <line x1="15" y1="45" x2="285" y2="45" stroke={C.rule} strokeWidth="0.5" opacity="0.5" />
-                    <line x1="15" y1="22.5" x2="285" y2="22.5" stroke={C.rule} strokeWidth="0.5" opacity="0.5" />
-                    <path d={`M 15 45 L 35 42 L 55 38 L 75 34 L 95 30 L 115 25 L 135 20 L 155 25 L 175 30 L 195 34 L 215 38 L 235 42 L 255 45 L 275 48 L 285 48 L 285 55 L 15 55 Z`} fill={`url(#priceGradient${result.id})`} />
-                    <polyline points="15,45 35,42 55,38 75,34 95,30 115,25 135,20 155,25 175,30 195,34 215,38 235,42 255,45 275,48" fill="none" stroke={C.fieldBlue} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    <circle cx="275" cy="48" r="2.5" fill={C.fieldBlue} stroke={C.paperDark} strokeWidth="1.5" />
-                  </svg>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', ...MONO, fontSize: '8px', color: C.inkLight }}>
-                    <span>${result.priceLow}</span>
-                    <span style={{ fontWeight: 'bold', color: C.fieldBlue }}>${result.price}</span>
-                    <span>${result.priceHigh}</span>
-                  </div>
+                  <button
+                    onClick={() => window.open(buildAmtrakUrl(from, to, date), '_blank')}
+                    className="book-btn"
+                    style={{ width: '100%', ...DISPLAY, fontSize: '9px', padding: '10px', borderRadius: '4px', border: 'none', background: C.fieldBlue, color: '#fff', cursor: 'pointer', letterSpacing: '0.06em' }}>
+                    Book on Amtrak <span style={{ fontSize: '1.2em' }}>→</span>
+                  </button>
+                  <button
+                    onClick={() => handleSave(result)}
+                    disabled={savedId === result.id}
+                    style={{ width: '100%', ...DISPLAY, fontSize: '9px', padding: '10px', borderRadius: '4px', border: `1px solid ${C.fieldBlue}`, background: savedId === result.id ? C.greenLight : 'transparent', color: savedId === result.id ? C.successGreen : C.fieldBlue, cursor: savedId === result.id ? 'default' : 'pointer', letterSpacing: '0.06em', marginTop: '8px' }}>
+                    {savedId === result.id ? 'Saved ✓' : 'Save Trip'}
+                  </button>
                 </div>
-
-                <button
-                  onClick={() => window.open(buildAmtrakUrl(from, to, date), '_blank')}
-                  style={{ width: '100%', ...DISPLAY, fontSize: '9px', padding: '10px', borderRadius: '4px', border: 'none', background: C.fieldBlue, color: '#fff', cursor: 'pointer', letterSpacing: '0.05em' }}>
-                  Book on Amtrak →
-                </button>
-                <button
-                  onClick={() => handleSave(result)}
-                  disabled={savedId === result.id}
-                  style={{ width: '100%', ...DISPLAY, fontSize: '9px', padding: '10px', borderRadius: '4px', border: `1px solid ${C.fieldBlue}`, background: savedId === result.id ? C.greenLight : 'transparent', color: savedId === result.id ? C.green : C.fieldBlue, cursor: savedId === result.id ? 'default' : 'pointer', letterSpacing: '0.05em', marginTop: '8px' }}>
-                  {savedId === result.id ? 'Saved ✓' : 'Save Trip'}
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -666,13 +692,15 @@ const BookingScreen = ({ onSaved }) => {
 
 // ─── NAVBAR ──────────────────────────────────────────────────────
 const NavBar = ({ active, onNav }) => (
-  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: C.paper, borderTop: `1.5px solid ${C.rule}`, display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: '40px', padding: '8px 0 20px' }}>
+  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: C.paper, borderTop: `1.5px solid ${C.rule}`, display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: '60px', padding: '12px 0 24px' }}>
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&display=swap');
       @keyframes pulse {
         0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
         50% { opacity: 0.5; transform: translateX(-50%) scale(1.4); }
       }
+      .book-btn:hover { background: #124480 !important; }
+      .corridor-select:focus { outline: none; border-color: #1a5c9e !important; box-shadow: 0 0 0 2px rgba(26,92,158,0.2); }
     `}</style>
     {['TRIPS', 'BOOKING'].map((tab) => {
       const isActive = active === tab.toLowerCase();
