@@ -102,6 +102,8 @@ router.get('/', async (req, res) => {
     if (date) {
       whereClause = 'WHERE departure_date = $1';
       params = [date];
+    } else if (req.query.past === 'true') {
+      whereClause = "WHERE departure_date >= CURRENT_DATE - INTERVAL '60 days' AND departure_date < CURRENT_DATE";
     }
 
     const result = await pool.query(
