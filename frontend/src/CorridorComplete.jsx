@@ -35,35 +35,14 @@ const BODY = { fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, li
 const MONO = { fontFamily: "'Courier New', monospace" };
 const ITALIC = { fontFamily: "'Georgia', serif", fontStyle: 'italic' };
 
-// ─── STATIONS ─────────────────────────────────────────────────────
+// ─── STATIONS (NEC + Acela only) ──────────────────────────────────
 const STATIONS = [
   { code: 'ABE', name: 'Aberdeen, MD' },
-  { code: 'ALT', name: 'Altoona, PA' },
-  { code: 'ALX', name: 'Alexandria, VA' },
-  { code: 'ARD', name: 'Ardmore, PA' },
   { code: 'BAL', name: 'Baltimore Penn Station, MD' },
   { code: 'BOS', name: 'Boston South Station, MA' },
   { code: 'BRP', name: 'Bridgeport, CT' },
   { code: 'BWI', name: 'BWI Airport, MD' },
-  { code: 'CLT', name: 'Charlotte, NC' },
-  { code: 'COT', name: 'Coatesville, PA' },
-  { code: 'CRY', name: 'Cary, NC' },
   { code: 'CWH', name: 'Cornwells Heights, PA' },
-  { code: 'DBN', name: 'Durham, NC' },
-  { code: 'DOW', name: 'Downingtown, PA' },
-  { code: 'ELZ', name: 'Elizabethtown, PA' },
-  { code: 'EXT', name: 'Exton, PA' },
-  { code: 'FBG', name: 'Fredericksburg, VA' },
-  { code: 'GAP', name: 'Gap, PA' },
-  { code: 'GBS', name: 'Greensburg, PA' },
-  { code: 'HAM', name: 'Hamlet, NC' },
-  { code: 'HAR', name: 'Harrisburg, PA' },
-  { code: 'HND', name: 'Henderson, NC' },
-  { code: 'JHN', name: 'Johnstown, PA' },
-  { code: 'LAT', name: 'Latrobe, PA' },
-  { code: 'LNC', name: 'Lancaster, PA' },
-  { code: 'LEW', name: 'Lewistown, PA' },
-  { code: 'MAL', name: 'Malvern, PA' },
   { code: 'MET', name: 'Metropark, NJ' },
   { code: 'MYS', name: 'Mystic, CT' },
   { code: 'NCR', name: 'New Carrollton, MD' },
@@ -73,22 +52,13 @@ const STATIONS = [
   { code: 'NWK', name: 'Newark Penn Station, NJ' },
   { code: 'NYP', name: 'New York Penn Station, NY' },
   { code: 'OSB', name: 'Old Saybrook, CT' },
-  { code: 'PAO', name: 'Paoli, PA' },
-  { code: 'PBG', name: 'Petersburg, VA' },
   { code: 'PHL', name: 'Philadelphia 30th Street, PA' },
-  { code: 'PIT', name: 'Pittsburgh, PA' },
   { code: 'PVD', name: 'Providence, RI' },
-  { code: 'RGH', name: 'Raleigh, NC' },
-  { code: 'RKM', name: 'Rocky Mount, NC' },
   { code: 'RTE', name: 'Route 128, MA' },
-  { code: 'RVR', name: 'Richmond, VA' },
-  { code: 'SBY', name: 'Selma, NC' },
   { code: 'STM', name: 'Stamford, CT' },
   { code: 'TRE', name: 'Trenton, NJ' },
-  { code: 'TYR', name: 'Tyrone, PA' },
   { code: 'WAS', name: 'Washington Union Station, DC' },
   { code: 'WIL', name: 'Wilmington, DE' },
-  { code: 'WLW', name: 'Wilson, NC' },
   { code: 'WLY', name: 'Westerly, RI' },
 ].sort((a, b) => a.code.localeCompare(b.code));
 
@@ -96,9 +66,6 @@ const STATIONS = [
 const getTrainName = (trainNumber) => {
   const num = parseInt(trainNumber);
   if (num >= 2100 && num <= 2299) return 'Acela';
-  if (num >= 40 && num <= 99) return 'Keystone';
-  if (num >= 600 && num <= 699) return 'Pennsylvanian';
-  if (num >= 79 && num <= 80) return 'Carolinian';
   return 'NEC Regional';
 };
 

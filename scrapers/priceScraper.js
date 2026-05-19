@@ -3,25 +3,78 @@ import pool from '../config/database.js';
 
 // Base fares per route (coach, one-way)
 const BASE_FARES = {
-  'NYP-WAS': 72, 'WAS-NYP': 72,
-  'NYP-BOS': 52, 'BOS-NYP': 52,
-  'NYP-PHL': 38, 'PHL-NYP': 38,
-  'WAS-PHL': 35, 'PHL-WAS': 35,
-  'WAS-BOS': 89, 'BOS-WAS': 89,
+  'NYP-WAS': 72,  'WAS-NYP': 72,
+  'NYP-BOS': 52,  'BOS-NYP': 52,
+  'NYP-PHL': 38,  'PHL-NYP': 38,
+  'WAS-PHL': 35,  'PHL-WAS': 35,
+  'WAS-BOS': 89,  'BOS-WAS': 89,
+};
+
+// Acela base fares (higher)
+const ACELA_FARES = {
+  'NYP-WAS': 155, 'WAS-NYP': 155,
+  'NYP-BOS': 175, 'BOS-NYP': 175,
 };
 
 const TRAINS = [
-  { number: '2151', origin: 'NYP', destination: 'WAS', depHour: 7  },
-  { number: '2153', origin: 'NYP', destination: 'WAS', depHour: 9  },
-  { number: '2155', origin: 'NYP', destination: 'WAS', depHour: 14 },
-  { number: '2157', origin: 'NYP', destination: 'WAS', depHour: 17 },
-  { number: '2150', origin: 'WAS', destination: 'NYP', depHour: 6  },
-  { number: '2152', origin: 'WAS', destination: 'NYP', depHour: 10 },
-  { number: '2154', origin: 'WAS', destination: 'NYP', depHour: 15 },
-  { number: '137',  origin: 'WAS', destination: 'BOS', depHour: 7  },
-  { number: '139',  origin: 'BOS', destination: 'WAS', depHour: 8  },
-  { number: '2173', origin: 'NYP', destination: 'BOS', depHour: 7  },
-  { number: '2175', origin: 'NYP', destination: 'BOS', depHour: 11 },
+  // Acela NYP↔WAS
+  { number: '2151', origin: 'NYP', destination: 'WAS', depHour: 7,  type: 'acela' },
+  { number: '2153', origin: 'NYP', destination: 'WAS', depHour: 9,  type: 'acela' },
+  { number: '2155', origin: 'NYP', destination: 'WAS', depHour: 12, type: 'acela' },
+  { number: '2157', origin: 'NYP', destination: 'WAS', depHour: 15, type: 'acela' },
+  { number: '2159', origin: 'NYP', destination: 'WAS', depHour: 17, type: 'acela' },
+  { number: '2163', origin: 'NYP', destination: 'WAS', depHour: 18, type: 'acela' },
+  { number: '2150', origin: 'WAS', destination: 'NYP', depHour: 6,  type: 'acela' },
+  { number: '2152', origin: 'WAS', destination: 'NYP', depHour: 10, type: 'acela' },
+  { number: '2154', origin: 'WAS', destination: 'NYP', depHour: 13, type: 'acela' },
+  { number: '2156', origin: 'WAS', destination: 'NYP', depHour: 15, type: 'acela' },
+  { number: '2158', origin: 'WAS', destination: 'NYP', depHour: 17, type: 'acela' },
+  { number: '2160', origin: 'WAS', destination: 'NYP', depHour: 19, type: 'acela' },
+  // Acela NYP↔BOS
+  { number: '2171', origin: 'NYP', destination: 'BOS', depHour: 7,  type: 'acela' },
+  { number: '2173', origin: 'NYP', destination: 'BOS', depHour: 11, type: 'acela' },
+  { number: '2175', origin: 'NYP', destination: 'BOS', depHour: 15, type: 'acela' },
+  { number: '2177', origin: 'NYP', destination: 'BOS', depHour: 19, type: 'acela' },
+  { number: '2170', origin: 'BOS', destination: 'NYP', depHour: 6,  type: 'acela' },
+  { number: '2172', origin: 'BOS', destination: 'NYP', depHour: 10, type: 'acela' },
+  { number: '2174', origin: 'BOS', destination: 'NYP', depHour: 14, type: 'acela' },
+  { number: '2176', origin: 'BOS', destination: 'NYP', depHour: 18, type: 'acela' },
+  // NEC Regional NYP↔WAS
+  { number: '95',  origin: 'NYP', destination: 'WAS', depHour: 6  },
+  { number: '97',  origin: 'NYP', destination: 'WAS', depHour: 7  },
+  { number: '83',  origin: 'NYP', destination: 'WAS', depHour: 8  },
+  { number: '85',  origin: 'NYP', destination: 'WAS', depHour: 9  },
+  { number: '87',  origin: 'NYP', destination: 'WAS', depHour: 10 },
+  { number: '89',  origin: 'NYP', destination: 'WAS', depHour: 11 },
+  { number: '125', origin: 'NYP', destination: 'WAS', depHour: 12 },
+  { number: '127', origin: 'NYP', destination: 'WAS', depHour: 14 },
+  { number: '129', origin: 'NYP', destination: 'WAS', depHour: 15 },
+  { number: '131', origin: 'NYP', destination: 'WAS', depHour: 16 },
+  { number: '133', origin: 'NYP', destination: 'WAS', depHour: 17 },
+  { number: '135', origin: 'NYP', destination: 'WAS', depHour: 18 },
+  { number: '86',  origin: 'WAS', destination: 'NYP', depHour: 5  },
+  { number: '88',  origin: 'WAS', destination: 'NYP', depHour: 7  },
+  { number: '90',  origin: 'WAS', destination: 'NYP', depHour: 9  },
+  { number: '92',  origin: 'WAS', destination: 'NYP', depHour: 11 },
+  { number: '94',  origin: 'WAS', destination: 'NYP', depHour: 13 },
+  { number: '96',  origin: 'WAS', destination: 'NYP', depHour: 15 },
+  { number: '130', origin: 'WAS', destination: 'NYP', depHour: 16 },
+  { number: '132', origin: 'WAS', destination: 'NYP', depHour: 17 },
+  { number: '134', origin: 'WAS', destination: 'NYP', depHour: 18 },
+  // NEC Regional NYP↔BOS
+  { number: '171', origin: 'NYP', destination: 'BOS', depHour: 5  },
+  { number: '173', origin: 'NYP', destination: 'BOS', depHour: 7  },
+  { number: '175', origin: 'NYP', destination: 'BOS', depHour: 11 },
+  { number: '177', origin: 'NYP', destination: 'BOS', depHour: 14 },
+  { number: '179', origin: 'NYP', destination: 'BOS', depHour: 18 },
+  { number: '170', origin: 'BOS', destination: 'NYP', depHour: 6  },
+  { number: '172', origin: 'BOS', destination: 'NYP', depHour: 8  },
+  { number: '174', origin: 'BOS', destination: 'NYP', depHour: 12 },
+  { number: '176', origin: 'BOS', destination: 'NYP', depHour: 16 },
+  // BOS↔WAS through trains
+  { number: '137', origin: 'WAS', destination: 'BOS', depHour: 7  },
+  { number: '139', origin: 'BOS', destination: 'WAS', depHour: 8  },
+  { number: '66',  origin: 'BOS', destination: 'WAS', depHour: 6  },
 ];
 
 function dynamicPrice(base, depHour, dayOfWeek, daysOut) {
@@ -79,7 +132,8 @@ export async function scrapeAmtrakPrices() {
     let inserted = 0;
 
     for (const train of TRAINS) {
-      const base = BASE_FARES[`${train.origin}-${train.destination}`] || 60;
+      const routeKey = `${train.origin}-${train.destination}`;
+      const base = (train.type === 'acela' ? ACELA_FARES[routeKey] : null) || BASE_FARES[routeKey] || 60;
       const price = dynamicPrice(base, train.depHour, dayOfWeek, 0);
       const high24h = Math.round(price * 1.22);
       const low24h  = Math.round(price * 0.82);
@@ -127,31 +181,8 @@ export async function scrapeAmtrakPrices() {
   }
 }
 
+// Historical delays are seeded by migrate.js on server startup with comprehensive FRA data.
+// This function is kept for scheduler compatibility but does nothing at runtime.
 export async function seedHistoricalDelays() {
-  try {
-    const historicalData = [
-      { origin: 'NYP', destination: 'WAS', dayOfWeek: 1, timeOfDay: 'morning',   delay10: 50, delay1030: 25, delay30: 25, avgDelay: 6,  sampleSize: 150 },
-      { origin: 'NYP', destination: 'WAS', dayOfWeek: 1, timeOfDay: 'afternoon', delay10: 40, delay1030: 35, delay30: 25, avgDelay: 10, sampleSize: 140 },
-      { origin: 'NYP', destination: 'WAS', dayOfWeek: 1, timeOfDay: 'evening',   delay10: 60, delay1030: 20, delay30: 20, avgDelay: 4,  sampleSize: 120 },
-      { origin: 'BOS', destination: 'NYP', dayOfWeek: 2, timeOfDay: 'morning',   delay10: 55, delay1030: 25, delay30: 20, avgDelay: 5,  sampleSize: 100 },
-      { origin: 'BOS', destination: 'NYP', dayOfWeek: 2, timeOfDay: 'afternoon', delay10: 45, delay1030: 30, delay30: 25, avgDelay: 8,  sampleSize: 95  },
-      { origin: 'PHL', destination: 'WAS', dayOfWeek: 3, timeOfDay: 'morning',   delay10: 70, delay1030: 20, delay30: 10, avgDelay: 3,  sampleSize: 80  },
-      { origin: 'PHL', destination: 'WAS', dayOfWeek: 3, timeOfDay: 'afternoon', delay10: 60, delay1030: 25, delay30: 15, avgDelay: 4,  sampleSize: 85  },
-    ];
-
-    for (const d of historicalData) {
-      await pool.query(
-        `INSERT INTO historical_delays (origin, destination, day_of_week, time_of_day, delay_under10min_percent, delay_10_30min_percent, delay_30plus_percent, avg_delay_minutes, sample_size)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-         ON CONFLICT (origin, destination, day_of_week, time_of_day)
-         DO UPDATE SET delay_under10min_percent=$5, delay_10_30min_percent=$6, delay_30plus_percent=$7, avg_delay_minutes=$8, sample_size=$9`,
-        [d.origin, d.destination, d.dayOfWeek, d.timeOfDay, d.delay10, d.delay1030, d.delay30, d.avgDelay, d.sampleSize]
-      );
-    }
-    console.log('[HISTORICAL SCRAPER] ✓ Seeded historical delay data');
-    return { success: true };
-  } catch (error) {
-    console.error('[HISTORICAL SCRAPER] Error:', error.message);
-    return { success: false, error: error.message };
-  }
+  return { success: true };
 }

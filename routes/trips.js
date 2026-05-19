@@ -83,6 +83,13 @@ async function getStops(origin, destination, trainNumber, departureTime, delayMi
   }));
 }
 
+const NEC_ORDER = ['BOS','RTE','PVD','WLY','NLC','OSB','MYS','NHV','BRP','STM','NRO','NYP','NWK','MET','CWH','TRE','PHL','WIL','ABE','BAL','BWI','NCR','WAS'];
+const getDirection = (o, d) => {
+  const oi = NEC_ORDER.indexOf(o), di = NEC_ORDER.indexOf(d);
+  if (oi < 0 || di < 0) return null;
+  return oi < di ? 'Southbound' : 'Northbound';
+};
+
 const router = express.Router();
 
 // GET /api/trips - Get all trips for a specific date (or upcoming)
@@ -128,7 +135,7 @@ router.get('/', async (req, res) => {
           currentLocation: delayPrediction.currentLocation || null,
           track: 'TBD',
           trackStatus: 'unannounced',
-          direction: 'Southbound',
+          direction: getDirection(trip.origin, trip.destination),
           recentAvgDelay: delayPrediction.predictedDelay,
           reasoning: delayPrediction.reasoning
         };
