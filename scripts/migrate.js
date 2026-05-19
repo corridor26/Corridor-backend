@@ -45,6 +45,25 @@ CREATE TABLE IF NOT EXISTS prices (
   UNIQUE(origin, destination, train_number, departure_date)
 );
 
+CREATE TABLE IF NOT EXISTS fare_observations (
+  id BIGSERIAL PRIMARY KEY,
+  origin VARCHAR(10) NOT NULL,
+  destination VARCHAR(10) NOT NULL,
+  departure_date DATE NOT NULL,
+  train_number VARCHAR(20) NOT NULL,
+  departure_time TIME,
+  arrival_time TIME,
+  lowest_fare DECIMAL(10,2),
+  fare_class VARCHAR(50),
+  sold_out BOOLEAN DEFAULT FALSE,
+  observed_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  scrape_success BOOLEAN DEFAULT TRUE,
+  scrape_error TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_fare_obs_chart ON fare_observations(origin, destination, departure_date, train_number, observed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_fare_obs_latest ON fare_observations(origin, destination, departure_date, observed_at DESC);
+
 CREATE TABLE IF NOT EXISTS schedules (
   train_number VARCHAR(10) PRIMARY KEY,
   route_key VARCHAR(20) NOT NULL,

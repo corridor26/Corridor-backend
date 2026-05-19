@@ -45,30 +45,11 @@ const L = (color = C.inkLight, extra = {}) => ({
 
 // ─── STATIONS (NEC + Acela only) ──────────────────────────────────
 const STATIONS = [
-  { code: 'ABE', name: 'Aberdeen, MD' },
-  { code: 'BAL', name: 'Baltimore Penn Station, MD' },
   { code: 'BOS', name: 'Boston South Station, MA' },
-  { code: 'BRP', name: 'Bridgeport, CT' },
-  { code: 'BWI', name: 'BWI Airport, MD' },
-  { code: 'CWH', name: 'Cornwells Heights, PA' },
-  { code: 'MET', name: 'Metropark, NJ' },
-  { code: 'MYS', name: 'Mystic, CT' },
-  { code: 'NCR', name: 'New Carrollton, MD' },
-  { code: 'NHV', name: 'New Haven, CT' },
-  { code: 'NLC', name: 'New London, CT' },
-  { code: 'NRO', name: 'New Rochelle, NY' },
-  { code: 'NWK', name: 'Newark Penn Station, NJ' },
   { code: 'NYP', name: 'New York Penn Station, NY' },
-  { code: 'OSB', name: 'Old Saybrook, CT' },
   { code: 'PHL', name: 'Philadelphia 30th Street, PA' },
-  { code: 'PVD', name: 'Providence, RI' },
-  { code: 'RTE', name: 'Route 128, MA' },
-  { code: 'STM', name: 'Stamford, CT' },
-  { code: 'TRE', name: 'Trenton, NJ' },
   { code: 'WAS', name: 'Washington Union Station, DC' },
-  { code: 'WIL', name: 'Wilmington, DE' },
-  { code: 'WLY', name: 'Westerly, RI' },
-].sort((a, b) => a.code.localeCompare(b.code));
+];
 
 // ─── HELPERS ─────────────────────────────────────────────────────
 const getTrainName = (trainNumber) => {
@@ -123,31 +104,132 @@ const getDelayRange = (delayMins) => {
   return `+${delayMins} min`;
 };
 
-const getPriceRec = (current, low, high) => {
-  if (!current || !low || !high || high === low) return null;
-  const ratio = (current - low) / (high - low);
-  if (ratio < 0.35) return { label: 'Book Now', sub: 'Near lowest observed fare', color: C.successGreen, bg: C.greenLight };
-  if (ratio < 0.65) return { label: 'Fair Price', sub: 'Mid-range fare today', color: C.orange, bg: C.amberLight };
-  return { label: 'Wait', sub: 'Near highest observed fare', color: C.red, bg: C.redLight };
-};
-
-// Generate illustrative price chart points from current/low/high anchors
-const genPricePoints = (current, low, high, count = 24) => {
-  if (!current || !low || !high) return [];
-  const range = high - low;
-  return Array.from({ length: count }, (_, i) => {
-    const t = i / (count - 1);
-    const wave = low + range * (0.25 + 0.65 * Math.abs(Math.sin(t * Math.PI)));
-    const jitter = (Math.sin(i * 5.7 + 1.1) * 0.12 + Math.cos(i * 2.9) * 0.08) * range;
-    const val = i === count - 1 ? current : Math.max(low, Math.min(high, wave + jitter));
-    return Math.round(val * 100) / 100;
-  });
-};
-
 // ─── SKELETON ─────────────────────────────────────────────────────
 const SkeletonCard = () => (
   <div style={{ borderRadius: '6px', height: '96px', background: C.paperDark }} className="shimmer" />
 );
+
+// ─── FARE CHART ──────────────────────────────────────────────────
+const FareChart = ({ origin, destination, departureDate, trainNumber }) => {
+  const [win, setWin] = useState('7d');
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!origin || !destination || !departureDate || !trainNumber) return;
+    setLoading(true);
+    setData(null);
+    fetch(`${API_BASE}/api/fares/chart?origin=${origin}&destination=${destination}&departureDate=${departureDate}&trainNumber=${trainNumber}&window=${win}`)
+      .then(r => r.json())
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [origin, destination, departureDate, trainNumber, win]);
+
+  const buildPath = (points, w = 320, h = 72, pad = 8) => {
+    if (!points || points.length < 2) return null;
+    const fares = points.map(p => p.fare);
+    const mn = Math.min(...fares) * 0.97;
+    const mx = Math.max(...fares) * 1.03;
+    const tx = i => pad + (i / (points.length - 1)) * (w - pad * 2);
+    const ty = v => h - pad - ((v - mn) / (mx - mn || 1)) * (h - pad * 2);
+    const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${tx(i)},${ty(p.fare)}`).join(' ');
+    return {
+      line,
+      fill: line + ` L ${tx(points.length - 1)},${h} L ${pad},${h} Z`,
+      lastX: tx(points.length - 1),
+      lastY: ty(fares[fares.length - 1]),
+    };
+  };
+
+  const chart = data?.points?.length >= 2 ? buildPath(data.points) : null;
+  const hasPoints = (data?.observationCount || 0) > 0;
+
+  return (
+    <div style={{ border: `1px solid ${C.rule}`, borderRadius: '6px', background: C.paperLight, overflow: 'hidden' }}>
+      <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.rule}`, background: C.paperDark, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ ...L() }}>Fare History</div>
+        <div style={{ display: 'flex', gap: '2px' }}>
+          {['24h', '7d', '30d'].map(v => (
+            <button
+              key={v}
+              onClick={() => setWin(v)}
+              style={{
+                ...L(win === v ? '#fff' : C.inkMid), fontSize: '9px',
+                padding: '4px 9px', borderRadius: '3px', border: 'none',
+                cursor: 'pointer', background: win === v ? C.fieldBlue : 'transparent',
+              }}
+            >{v.toUpperCase()}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ padding: '14px' }}>
+        {loading && (
+          <div style={{ ...BODY, fontSize: '12px', color: C.inkLight, textAlign: 'center', padding: '20px 0' }}>
+            Loading fare history…
+          </div>
+        )}
+
+        {!loading && !hasPoints && (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <div style={{ ...DISPLAY, fontSize: '12px', color: C.ink, marginBottom: '6px' }}>Fare Tracking Active</div>
+            <div style={{ ...BODY, fontSize: '12px', color: C.inkLight, marginBottom: '4px' }}>
+              {(data?.daysCovered || 0) > 0
+                ? `${data.daysCovered} day${data.daysCovered !== 1 ? 's' : ''} of fare history collected`
+                : 'Observations starting — check back soon'}
+            </div>
+            {data?.lastObserved && (
+              <div style={{ ...L(), fontSize: '9px', marginTop: '4px' }}>Last observed {data.lastObserved}</div>
+            )}
+          </div>
+        )}
+
+        {!loading && hasPoints && (
+          <>
+            {chart ? (
+              <svg width="100%" height="80" viewBox="0 0 320 80" preserveAspectRatio="xMidYMid meet" style={{ marginBottom: '10px' }}>
+                <defs>
+                  <linearGradient id="fareGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style={{ stopColor: C.fieldBlue, stopOpacity: 0.12 }} />
+                    <stop offset="100%" style={{ stopColor: C.fieldBlue, stopOpacity: 0 }} />
+                  </linearGradient>
+                </defs>
+                {[20, 40, 60].map(y => <line key={y} x1="8" y1={y} x2="312" y2={y} stroke={C.ruleLight} strokeWidth="0.5" />)}
+                <path d={chart.fill} fill="url(#fareGrad)" />
+                <path d={chart.line} fill="none" stroke={C.fieldBlue} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx={chart.lastX} cy={chart.lastY} r="3.5" fill={C.fieldBlue} stroke={C.paperLight} strokeWidth="2" />
+              </svg>
+            ) : (
+              <div style={{ ...BODY, fontSize: '12px', color: C.inkLight, textAlign: 'center', padding: '10px 0 14px' }}>
+                {data?.points?.length === 1 ? '1 observation — chart available after more data is collected' : 'Insufficient data for chart'}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+              {[
+                { label: 'Current',        val: data.currentFare, color: C.fieldBlue },
+                { label: `${win} High`,     val: data.windowHigh,  color: C.red },
+                { label: `${win} Low`,      val: data.windowLow,   color: C.successGreen },
+              ].map(item => (
+                <div key={item.label} style={{ background: C.paperDark, borderRadius: '4px', padding: '10px 8px' }}>
+                  <div style={{ ...L(), marginBottom: '4px' }}>{item.label}</div>
+                  <div style={{ ...MONO, fontSize: '15px', fontWeight: 'bold', color: item.color, ...TABNUM }}>
+                    {item.val != null ? `$${Math.round(item.val)}` : '—'}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', ...L(), fontSize: '9px' }}>
+              <span>{data.daysCovered} day{data.daysCovered !== 1 ? 's' : ''} of history · {data.totalObservations} observations</span>
+              {data.lastObserved && <span>Updated {data.lastObserved}</span>}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // ─── STATION SELECT ───────────────────────────────────────────────
 const StationSelect = ({ value, onChange, label, exclude }) => {
@@ -581,7 +663,6 @@ const TripsScreen = ({ onSelectTrip, onTrackTrain, addToast }) => {
 const TripDetailScreen = ({ trip, onBack, addToast }) => {
   const [detail, setDetail] = useState(null);
   const [weather, setWeather] = useState(null);
-  const [priceView, setPriceView] = useState('24h');
 
   useEffect(() => {
     fetch(`${API_BASE}/api/trips/${trip.id}`).then(r => r.json()).then(setDetail).catch(() => {});
@@ -592,9 +673,6 @@ const TripDetailScreen = ({ trip, onBack, addToast }) => {
   const stops = detail?.stops || [];
   const delayRange = getDelayRange(d.aiDelay);
   const delayColor = (d.aiDelay || 0) === 0 ? C.successGreen : C.orange;
-  const priceRec   = getPriceRec(detail?.currentPrice, detail?.low24h, detail?.high24h);
-
-  const pricePoints = genPricePoints(detail?.currentPrice, detail?.low24h, detail?.high24h);
 
   const handleShare = () => {
     const url = buildAmtrakUrl(trip.fromCode, trip.toCode, trip.rawDate || today());
@@ -607,24 +685,6 @@ const TripDetailScreen = ({ trip, onBack, addToast }) => {
     const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`${d.trainName} #${d.number} ${d.fromCode}→${d.toCode}`)}&dates=${raw.replace(/-/g,'')}/${raw.replace(/-/g,'')}`;
     window.open(url, '_blank');
   };
-
-  // Build SVG chart path from price points
-  const buildChartPath = (points, w = 320, h = 70, pad = 8) => {
-    if (!points.length) return { line: '', fill: '' };
-    const min = Math.min(...points) * 0.98;
-    const max = Math.max(...points) * 1.02;
-    const toX = (i) => pad + (i / (points.length - 1)) * (w - pad * 2);
-    const toY = (v) => h - pad - ((v - min) / (max - min || 1)) * (h - pad * 2);
-    const pts = points.map((v, i) => `${toX(i)},${toY(v)}`).join(' ');
-    const firstY = toY(points[0]), lastY = toY(points[points.length - 1]);
-    return {
-      line: `M ${pad},${firstY} ` + points.map((v, i) => `${toX(i)},${toY(v)}`).join(' L '),
-      fill: `M ${pad},${firstY} ` + points.map((v, i) => `${toX(i)},${toY(v)}`).join(' L ') + ` L ${w - pad},${h} L ${pad},${h} Z`,
-      lastX: toX(points.length - 1), lastY,
-      minY: toY(Math.min(...points)), maxY: toY(Math.max(...points)),
-    };
-  };
-  const chart = buildChartPath(pricePoints);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: C.paper }}>
@@ -771,86 +831,13 @@ const TripDetailScreen = ({ trip, onBack, addToast }) => {
           </div>
         </div>
 
-        {/* Fare History — with period toggle */}
-        <div style={{ border: `1px solid ${C.rule}`, borderRadius: '6px', background: C.paperLight, overflow: 'hidden' }}>
-          {/* Header row with toggle */}
-          <div style={{ padding: '12px 14px', borderBottom: `1px solid ${C.rule}`, background: C.paperDark, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ ...L() }}>Fare History</div>
-            <div style={{ display: 'flex', gap: '2px' }}>
-              {['24h', 'Week', 'Month'].map(v => (
-                <button
-                  key={v}
-                  onClick={() => setPriceView(v.toLowerCase())}
-                  style={{
-                    ...L(priceView === v.toLowerCase() ? '#fff' : C.inkMid),
-                    fontSize: '9px', padding: '4px 9px', borderRadius: '3px', border: 'none', cursor: 'pointer',
-                    background: priceView === v.toLowerCase() ? C.fieldBlue : 'transparent',
-                  }}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ padding: '14px' }}>
-            {priceView === '24h' && pricePoints.length > 0 && (
-              <>
-                <svg width="100%" height="80" viewBox="0 0 320 80" preserveAspectRatio="xMidYMid meet" style={{ marginBottom: '10px' }}>
-                  <defs>
-                    <linearGradient id="priceGradFill" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" style={{ stopColor: C.fieldBlue, stopOpacity: 0.12 }} />
-                      <stop offset="100%" style={{ stopColor: C.fieldBlue, stopOpacity: 0 }} />
-                    </linearGradient>
-                  </defs>
-                  {[20, 40, 60].map(y => <line key={y} x1="8" y1={y} x2="312" y2={y} stroke={C.ruleLight} strokeWidth="0.5" />)}
-                  {chart.fill && <path d={chart.fill} fill="url(#priceGradFill)" />}
-                  {chart.line && <path d={chart.line} fill="none" stroke={C.fieldBlue} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
-                  {chart.lastX && <circle cx={chart.lastX} cy={chart.lastY} r="3.5" fill={C.fieldBlue} stroke={C.paperLight} strokeWidth="2" />}
-                </svg>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                  {[
-                    { label: 'Current', val: detail?.currentPrice, color: C.fieldBlue },
-                    { label: '24h High', val: detail?.high24h, color: C.red },
-                    { label: '24h Low',  val: detail?.low24h,  color: C.successGreen },
-                  ].map(item => (
-                    <div key={item.label} style={{ background: C.paperDark, borderRadius: '4px', padding: '10px 8px' }}>
-                      <div style={{ ...L(), marginBottom: '4px' }}>{item.label}</div>
-                      <div style={{ ...MONO, fontSize: '15px', fontWeight: 'bold', color: item.color, ...TABNUM }}>{item.val ? `$${item.val}` : '—'}</div>
-                    </div>
-                  ))}
-                </div>
-                {priceRec && (
-                  <div style={{ marginTop: '10px', background: priceRec.bg, borderRadius: '4px', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ ...DISPLAY, fontSize: '12px', color: priceRec.color }}>{priceRec.label}</div>
-                      <div style={{ ...BODY, fontSize: '11px', color: priceRec.color, marginTop: '2px' }}>{priceRec.sub}</div>
-                    </div>
-                    {priceRec.label === 'Book Now' && (
-                      <button onClick={() => window.open(buildAmtrakUrl(trip.fromCode, trip.toCode, trip.rawDate || today()), '_blank')}
-                        style={{ ...DISPLAY, fontSize: '10px', padding: '7px 12px', borderRadius: '4px', border: 'none', background: C.successGreen, color: '#fff', cursor: 'pointer' }}>
-                        Book →
-                      </button>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-            {priceView !== '24h' && (
-              <div style={{ padding: '24px 0', textAlign: 'center' }}>
-                <div style={{ ...BODY, fontSize: '13px', color: C.inkMid, marginBottom: '6px' }}>
-                  {priceView === 'week' ? 'Weekly' : 'Monthly'} price history
-                </div>
-                <div style={{ ...BODY, fontSize: '12px', color: C.inkLight }}>
-                  More fare history is being collected. Check back soon.
-                </div>
-              </div>
-            )}
-            {priceView === '24h' && pricePoints.length === 0 && (
-              <div style={{ padding: '24px 0', textAlign: 'center', ...BODY, fontSize: '12px', color: C.inkLight }}>No price data for this train yet.</div>
-            )}
-          </div>
-        </div>
+        {/* Fare History */}
+        <FareChart
+          origin={trip.fromCode}
+          destination={trip.toCode}
+          departureDate={trip.rawDate}
+          trainNumber={trip.number}
+        />
 
         <button
           onClick={() => window.open(buildAmtrakUrl(trip.fromCode, trip.toCode, trip.rawDate || today()), '_blank')}
@@ -896,7 +883,6 @@ const BookingScreen = ({ addToast, searchState, setSearchState }) => {
         train: r.train, trainType: r.trainType,
         avgDelay: r.delay ?? 0,
         aiDelay: r.delay ?? 0, aiConfidence: r.aiConfidence || 75,
-        priceHigh: Math.round(r.price * 1.22), priceLow: Math.round(r.price * 0.82),
         trend: r.trend,
       })));
       saveRecent(f, t, d);
@@ -989,20 +975,9 @@ const BookingScreen = ({ addToast, searchState, setSearchState }) => {
             )}
 
             {results.map(result => {
-              const rec = getPriceRec(result.price, result.priceLow, result.priceHigh);
               const isSaved = savedId === result.id;
               const delayRange = getDelayRange(result.aiDelay);
               const delayColor = result.aiDelay === 0 ? C.successGreen : result.aiDelay <= 10 ? C.orange : C.red;
-              const pts = genPricePoints(result.price, result.priceLow, result.priceHigh);
-              const chart = (() => {
-                if (!pts.length) return null;
-                const mn = Math.min(...pts) * 0.97, mx = Math.max(...pts) * 1.03;
-                const tx = i => 8 + (i / (pts.length - 1)) * 284;
-                const ty = v => 68 - ((v - mn) / (mx - mn || 1)) * 56;
-                const line = pts.map((v, i) => `${i === 0 ? 'M' : 'L'} ${tx(i)},${ty(v)}`).join(' ');
-                const fill = line + ` L ${tx(pts.length-1)},75 L 8,75 Z`;
-                return { line, fill, lastX: tx(pts.length-1), lastY: ty(pts[pts.length-1]) };
-              })();
 
               return (
                 <div key={result.id} style={{ border: `1px solid ${C.rule}`, borderRadius: '6px', padding: '14px', background: C.paperLight, marginBottom: '10px' }}>
@@ -1050,34 +1025,13 @@ const BookingScreen = ({ addToast, searchState, setSearchState }) => {
                     </div>
                   </div>
 
-                  {/* Price chart */}
-                  <div style={{ marginBottom: '12px', padding: '10px 12px', background: C.paperDark, borderRadius: '4px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <div style={{ ...L() }}>24h Price Trend</div>
-                      {rec && (
-                        <div style={{ ...DISPLAY, fontSize: '9px', padding: '3px 8px', borderRadius: '3px', background: rec.bg, color: rec.color }}>{rec.label}</div>
-                      )}
-                    </div>
-                    {chart && (
-                      <svg width="100%" height="75" viewBox="0 0 300 75" preserveAspectRatio="xMidYMid meet" style={{ marginBottom: '6px' }}>
-                        <defs>
-                          <linearGradient id={`pg${result.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" style={{ stopColor: C.fieldBlue, stopOpacity: 0.12 }} />
-                            <stop offset="100%" style={{ stopColor: C.fieldBlue, stopOpacity: 0 }} />
-                          </linearGradient>
-                        </defs>
-                        {[20, 40, 60].map(y => <line key={y} x1="8" y1={y} x2="292" y2={y} stroke={C.ruleLight} strokeWidth="0.5" />)}
-                        <path d={chart.fill} fill={`url(#pg${result.id})`} />
-                        <path d={chart.line} fill="none" stroke={C.fieldBlue} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        <circle cx={chart.lastX} cy={chart.lastY} r="3" fill={C.fieldBlue} stroke={C.paperDark} strokeWidth="1.5" />
-                      </svg>
-                    )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', ...BODY, fontSize: '11px' }}>
-                      <span style={{ color: C.successGreen, ...TABNUM }}>Low ${result.priceLow}</span>
-                      <span style={{ fontWeight: 700, color: C.fieldBlue, ...TABNUM }}>Now ${result.price}</span>
-                      <span style={{ color: C.red, ...TABNUM }}>High ${result.priceHigh}</span>
-                    </div>
-                  </div>
+                  {/* Fare History */}
+                  <FareChart
+                    origin={from}
+                    destination={to}
+                    departureDate={date}
+                    trainNumber={result.train}
+                  />
 
                   <button
                     onClick={() => window.open(buildAmtrakUrl(from, to, date), '_blank')}

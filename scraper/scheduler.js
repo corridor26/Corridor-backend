@@ -2,6 +2,7 @@
 import cron from 'node-cron';
 import { scrapeAmtrakDelays } from '../scrapers/amtrakScraper.js';
 import { scrapeAmtrakPrices, seedHistoricalDelays } from '../scrapers/priceScraper.js';
+import { scrapeFares } from '../scrapers/fareScraper.js';
 
 export function initializeScheduler() {
   console.log('[SCHEDULER] Initializing cron jobs...');
@@ -23,6 +24,16 @@ export function initializeScheduler() {
       await scrapeAmtrakPrices();
     } catch (error) {
       console.error('[CRON] Error in price scraper:', error);
+    }
+  });
+
+  // Run fare observation scraper every hour (at 45 minutes past)
+  cron.schedule('45 * * * *', async () => {
+    console.log('[CRON] Running fare observation scraper...');
+    try {
+      await scrapeFares();
+    } catch (error) {
+      console.error('[CRON] Error in fare scraper:', error);
     }
   });
 
@@ -49,6 +60,7 @@ export async function runScrapersOnStartup() {
     await scrapeAmtrakDelays();
     await scrapeAmtrakPrices();
     await seedHistoricalDelays();
+    await scrapeFares();
     console.log('[STARTUP] ✓ Initial scrapers completed');
   } catch (error) {
     console.error('[STARTUP] Error:', error);
