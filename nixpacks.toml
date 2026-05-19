@@ -1,25 +1,26 @@
-# System libraries required to run Chromium (used by puppeteer)
-# Puppeteer downloads its own Chrome during npm install; this provides the runtime deps.
+# System libraries required by Chromium at runtime (puppeteer uses bundled Chrome)
+# aptPkgs ADDS to Railway's default Node.js setup; nixPkgs replaces it (breaks npm)
 [phases.setup]
-nixPkgs = [
-  "nss",
-  "nspr",
-  "atk",
-  "cups",
-  "dbus",
-  "libdrm",
-  "libxkbcommon",
-  "mesa",
-  "pango",
-  "xorg.libX11",
-  "xorg.libXcomposite",
-  "xorg.libXdamage",
-  "xorg.libXext",
-  "xorg.libXfixes",
-  "xorg.libXrandr",
-  "xorg.libxcb",
-  "alsa-lib",
-  "expat",
-  "glib",
-  "gtk3"
+aptPkgs = [
+  "libnss3",
+  "libatk1.0-0",
+  "libatk-bridge2.0-0",
+  "libcups2",
+  "libdbus-1-3",
+  "libdrm2",
+  "libxkbcommon0",
+  "libgbm1",
+  "libpangocairo-1.0-0",
+  "libx11-6",
+  "libxcomposite1",
+  "libxdamage1",
+  "libxext6",
+  "libxfixes3",
+  "libxrandr2",
+  "libxcb1",
+  "libasound2",
+  "libexpat1",
+  "libglib2.0-0",
+  "libgtk-3-0",
+  "libxshmfence1"
 ]
