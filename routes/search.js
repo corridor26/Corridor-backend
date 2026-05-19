@@ -1,5 +1,6 @@
 // routes/search.js
 import express from 'express';
+import axios from 'axios';
 import pool from '../config/database.js';
 import { predictDelay } from '../utils/delayPredictor.js';
 
@@ -188,6 +189,28 @@ const BASE_PRICES = {
   'WAS-BOS': { regional: 149 },
 };
 
+function computeDuration(dep, arr) {
+  if (!dep || !arr) return null;
+  const [dh, dm] = dep.split(':').map(Number);
+  const [ah, am] = arr.split(':').map(Number);
+  let mins = (ah * 60 + am) - (dh * 60 + dm);
+  if (mins < 0) mins += 1440;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+// Parse a time value from Amtrak API responses into HH:MM
+function parseApiTime(raw) {
+  if (!raw) return null;
+  const s = String(raw);
+  const iso = s.match(/T(\d{2}):(\d{2})/);
+  if (iso) return `${iso[1]}:${iso[2]}`;
+  const hm = s.match(/^(\d{1,2}):(\d{2})/);
+  if (hm) return `${String(hm[1]).padStart(2, '0')}:${hm[2]}`;
+  return null;
+}
+
 function estimatePrice(routeKey, trainType, boardTime, dateStr) {
   const base = BASE_PRICES[routeKey]?.[trainType] ?? 79;
   const [h] = boardTime.split(':').map(Number);
@@ -202,6 +225,71 @@ function estimatePrice(routeKey, trainType, boardTime, dateStr) {
   return Math.round(price);
 }
 
+async function searchAmtrakLive(origin, destination, dateStr) {
+  const [year, month, day] = dateStr.split('-');
+  const { data } = await axios.get(
+    'https://www.amtrak.com/services/journeys/findTrains.json',
+    {
+      params: {
+        fromStation: origin,
+        toStation: destination,
+        departDate: `${month}/${day}/${year}`,
+        numberOfAdults: '1',
+      },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.amtrak.com/buy/departure.html',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      timeout: 8000,
+    }
+  );
+
+  const list = data?.trains || data?.departures || (Array.isArray(data) ? data : null);
+  if (!list || !Array.isArray(list) || list.length === 0) return null;
+
+  const results = list.map(t => {
+    const num = String(t.trainNumber || t.number || '').trim();
+    if (!num) return null;
+    const depTime = parseApiTime(t.departureTime || t.depTime);
+    const arrTime = parseApiTime(t.arrivalTime || t.arrTime);
+    if (!depTime) return null;
+
+    let price = null;
+    const fareList = t.fares || t.prices || [];
+    if (Array.isArray(fareList) && fareList.length > 0) {
+      const avail = fareList.filter(f => {
+        const p = parseFloat(f.price || f.amount || 0);
+        return p > 0 && !(f.soldOut || f.isSoldOut);
+      });
+      if (avail.length > 0) {
+        avail.sort((a, b) => parseFloat(a.price || a.amount) - parseFloat(b.price || b.amount));
+        price = parseFloat(avail[0].price || avail[0].amount);
+      }
+    } else if (t.lowestFare || t.fare) {
+      price = parseFloat(t.lowestFare || t.fare);
+    }
+
+    const isAcela = parseInt(num) >= 2100;
+    return {
+      train: num,
+      trainType: isAcela ? 'acela' : 'regional',
+      trainName: isAcela ? 'Acela' : 'NEC Regional',
+      time: depTime,
+      arriveTime: arrTime,
+      duration: computeDuration(depTime, arrTime),
+      price,
+      fareSource: price ? 'live' : null,
+      trend: null,
+      delay: 0,
+    };
+  }).filter(Boolean);
+
+  return results.length > 0 ? results : null;
+}
+
 // GET /api/search
 router.get('/', async (req, res) => {
   try {
@@ -210,77 +298,132 @@ router.get('/', async (req, res) => {
       return res.status(400).json({ error: 'Missing required query parameters: origin, destination, date' });
     }
 
-    const routeKeys = getApplicableRouteKeys(origin, destination);
-    if (routeKeys.length === 0) return res.json([]);
+    // Try live Amtrak data first — accurate real schedule
+    let trains = null;
+    try {
+      trains = await searchAmtrakLive(origin, destination, date);
+      if (trains) console.log(`[SEARCH] Live Amtrak: ${trains.length} trains for ${origin}→${destination} ${date}`);
+    } catch (err) {
+      console.log(`[SEARCH] Live Amtrak failed (${err.message}), using static schedules`);
+    }
 
-    const dow = new Date(date + 'T00:00:00').getDay();
+    // Fall back to static schedules
+    if (!trains) {
+      const routeKeys = getApplicableRouteKeys(origin, destination);
+      if (routeKeys.length === 0) return res.json([]);
 
-    const placeholders = routeKeys.map((_, i) => `$${i + 1}`).join(', ');
-    const schedResult = await pool.query(
-      `SELECT * FROM schedules WHERE route_key IN (${placeholders})`,
-      routeKeys
-    ).catch(() => ({ rows: [] }));
+      const dow = new Date(date + 'T00:00:00').getDay();
+      const placeholders = routeKeys.map((_, i) => `$${i + 1}`).join(', ');
+      const schedResult = await pool.query(
+        `SELECT * FROM schedules WHERE route_key IN (${placeholders})`,
+        routeKeys
+      ).catch(() => ({ rows: [] }));
 
-    const todaySchedules = schedResult.rows.filter(s => {
-      const days = s.days_of_week.split(',').map(d => parseInt(d.trim()));
-      return days.includes(dow);
-    });
+      const daySchedules = schedResult.rows.filter(s => {
+        const days = s.days_of_week.split(',').map(d => parseInt(d.trim()));
+        return days.includes(dow);
+      });
 
-    if (todaySchedules.length === 0) return res.json([]);
-
-    const results = await Promise.all(
-      todaySchedules.map(async (sched) => {
+      trains = daySchedules.map(sched => {
         const trainType = sched.train_type;
         const routeKey  = sched.route_key;
-
-        const oOffset = getOffset(routeKey, trainType, origin);
-        const dOffset = getOffset(routeKey, trainType, destination);
+        const oOffset   = getOffset(routeKey, trainType, origin);
+        const dOffset   = getOffset(routeKey, trainType, destination);
         if (oOffset === null || dOffset === null) return null;
-
         const terminalDep = sched.departure_time.substring(0, 5);
         const boardTime   = addMins(terminalDep, oOffset);
         const alightTime  = addMins(terminalDep, dOffset);
+        const isAcela     = trainType === 'acela';
+        return {
+          train: sched.train_number,
+          trainType,
+          trainName: isAcela ? 'Acela' : 'NEC Regional',
+          time: boardTime,
+          arriveTime: alightTime,
+          duration: computeDuration(boardTime, alightTime),
+          price: null,
+          fareSource: null,
+          trend: null,
+          delay: 0,
+        };
+      }).filter(Boolean);
+    }
 
-        let price = null, trend = null;
-        try {
-          const pr = await pool.query(
-            `SELECT current_price, trend FROM prices
-             WHERE origin = $1 AND destination = $2 AND train_number = $3 AND departure_date = $4
-             ORDER BY scraped_at DESC LIMIT 1`,
-            [origin, destination, sched.train_number, date]
-          );
-          if (pr.rows.length > 0) {
-            price = parseFloat(pr.rows[0].current_price);
-            trend = pr.rows[0].trend;
-          }
-        } catch { /* use estimate */ }
+    if (!trains || trains.length === 0) return res.json([]);
 
-        if (price === null) price = estimatePrice(routeKey, trainType, boardTime, date);
+    // Enrich each train with fare and delay data
+    const enriched = await Promise.all(
+      trains.map(async (t) => {
+        // Fare: check fare_observations first, then prices table, then estimate
+        let price = t.price;
+        let fareSource = t.fareSource;
 
+        if (!price) {
+          try {
+            const obsRow = await pool.query(
+              `SELECT lowest_fare FROM fare_observations
+               WHERE origin=$1 AND destination=$2 AND departure_date=$3 AND train_number=$4
+                 AND scrape_success=true AND lowest_fare IS NOT NULL
+               ORDER BY observed_at DESC LIMIT 1`,
+              [origin, destination, date, t.train]
+            );
+            if (obsRow.rows.length > 0) {
+              price     = parseFloat(obsRow.rows[0].lowest_fare);
+              fareSource = 'live';
+            }
+          } catch {}
+        }
+
+        if (!price) {
+          try {
+            const prRow = await pool.query(
+              `SELECT current_price, trend FROM prices
+               WHERE origin=$1 AND destination=$2 AND train_number=$3 AND departure_date=$4
+               ORDER BY scraped_at DESC LIMIT 1`,
+              [origin, destination, t.train, date]
+            );
+            if (prRow.rows.length > 0) {
+              price     = parseFloat(prRow.rows[0].current_price);
+              fareSource = 'scraped';
+              t.trend   = prRow.rows[0].trend || null;
+            }
+          } catch {}
+        }
+
+        if (!price) {
+          const routeKey = getApplicableRouteKeys(origin, destination)[0] || `${origin}-${destination}`;
+          price     = estimatePrice(routeKey, t.trainType, t.time, date);
+          fareSource = 'estimate';
+        }
+
+        // Delay prediction
         let aiDelay = 0;
         try {
           const pred = await predictDelay({
             origin, destination,
-            train_number: sched.train_number,
+            train_number: t.train,
             departure_date: date,
-            departure_time: boardTime,
+            departure_time: t.time,
           });
           aiDelay = pred.predictedDelay || 0;
-        } catch { /* no delay info */ }
+        } catch {}
 
         return {
-          train: sched.train_number,
-          trainType,
-          time: boardTime,
-          arriveTime: alightTime,
+          train:     t.train,
+          trainName: t.trainName,
+          trainType: t.trainType,
+          time:      t.time,
+          arriveTime: t.arriveTime,
+          duration:  t.duration,
           price,
-          trend: trend || null,
-          delay: aiDelay,
+          fareSource,
+          trend:     t.trend || null,
+          delay:     aiDelay,
         };
       })
     );
 
-    const sorted = results
+    const sorted = enriched
       .filter(Boolean)
       .sort((a, b) => a.time.localeCompare(b.time));
 

@@ -71,6 +71,17 @@ const today     = () => new Date().toISOString().split('T')[0];
 const tomorrowStr = () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; };
 const isPastDate  = (rawDate) => !!rawDate && rawDate < today();
 
+const computeDuration = (dep, arr) => {
+  if (!dep || !arr) return null;
+  const [dh, dm] = dep.split(':').map(Number);
+  const [ah, am] = arr.split(':').map(Number);
+  let mins = (ah * 60 + am) - (dh * 60 + dm);
+  if (mins < 0) mins += 1440;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+};
+
 const getStationName = (code) => STATIONS.find(s => s.code === code)?.name || code;
 
 const getCountdown = (rawDate, departure) => {
@@ -226,6 +237,42 @@ const FareChart = ({ origin, destination, departureDate, trainNumber }) => {
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+};
+
+// ─── SPLASH SCREEN ───────────────────────────────────────────────
+const SplashScreen = ({ onDone }) => {
+  const [fading, setFading] = useState(false);
+  useEffect(() => {
+    const t1 = setTimeout(() => setFading(true), 2000);
+    const t2 = setTimeout(onDone, 2600);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [onDone]);
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 9999,
+      background: C.fieldBlue,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      gap: '18px',
+      opacity: fading ? 0 : 1,
+      transition: 'opacity 0.55s ease',
+    }}>
+      <div style={{ animation: 'splashFadeUp 0.65s ease-out both', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+        <svg width="56" height="28" viewBox="0 0 80 40">
+          <path d="M 0 0 L 32 20 L 0 40 L 11 40 L 43 20 L 11 0 Z" fill={C.chevronRed} />
+          <rect x="16" y="10" width="64" height="7" fill="#fff" />
+          <rect x="16" y="23" width="64" height="7" fill="#fff" />
+        </svg>
+        <div style={{ ...DISPLAY, fontSize: '30px', color: '#fff', letterSpacing: '0.1em' }}>CORRIDOR</div>
+      </div>
+      <div style={{ animation: 'splashFadeUp 0.65s 0.28s ease-out both', ...ITALIC, fontSize: '12px', color: 'rgba(255,255,255,0.6)', textAlign: 'center', maxWidth: '210px', lineHeight: 1.55 }}>
+        Intelligent train travel across the Northeast Corridor
+      </div>
+      <div style={{ animation: 'splashFadeUp 0.65s 0.45s ease-out both', width: '56px', height: '2px', background: 'rgba(255,255,255,0.18)', borderRadius: '1px', overflow: 'hidden', marginTop: '4px' }}>
+        <div style={{ width: '28px', height: '100%', background: 'rgba(255,255,255,0.7)', borderRadius: '1px', animation: 'trackSlide 1.1s ease-in-out infinite' }} />
       </div>
     </div>
   );
@@ -469,7 +516,6 @@ const TripCard = ({ trip, onClick, onDelete, isNext, index = 0, dimmed = false }
             <div style={{ padding: '8px 12px', borderRight: `1px solid ${C.ruleLight}` }}>
               <div style={{ ...L(), marginBottom: '3px' }}>Forecast</div>
               <div style={{ ...BODY, fontSize: '12px', fontWeight: 700, color: delayColor, ...TABNUM }}>{delayRange}</div>
-              <div style={{ ...L(), fontSize: '9px', marginTop: '2px' }}>{trip.aiConfidence || 72}% conf</div>
             </div>
             <div style={{ padding: '8px 12px' }}>
               <div style={{ ...L(), marginBottom: '3px' }}>En Route</div>
@@ -735,7 +781,7 @@ const TripDetailScreen = ({ trip, onBack, addToast }) => {
             {delayRange}
           </div>
           <div style={{ ...BODY, fontSize: '12px', color: C.inkMid, marginBottom: '8px', ...TABNUM }}>
-            {(d.aiConfidence || 72)}% probability · Based on {d.recentAvgDelay !== undefined ? '4 recent trains' : 'historical patterns'}
+            Based on {d.recentAvgDelay !== undefined ? '4 recent trains' : 'historical data'}
           </div>
           <div style={{ ...ITALIC, fontSize: '11px', color: C.fieldBlue, lineHeight: 1.5 }}>
             {d.reasoning || 'Based on historical delay patterns for this route.'}
@@ -878,13 +924,22 @@ const BookingScreen = ({ addToast, searchState, setSearchState }) => {
       const data = await res.json();
       if (data.error) { addToast?.(data.error, 'error'); setSearchResults([]); setSearching(false); return; }
       if (!Array.isArray(data) || data.length === 0) { setSearchResults([]); setSearching(false); return; }
-      setSearchResults(data.map((r, i) => ({
+      const now = new Date();
+      const currentHHMM = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      const mapped = data.map((r, i) => ({
         id: i + 1, time: r.time, arrival: r.arriveTime, price: r.price,
-        train: r.train, trainType: r.trainType,
+        train: r.train, trainName: r.trainName,
+        trainType: r.trainType,
         avgDelay: r.delay ?? 0,
-        aiDelay: r.delay ?? 0, aiConfidence: r.aiConfidence || 75,
+        aiDelay: r.delay ?? 0,
         trend: r.trend,
-      })));
+        duration: r.duration || computeDuration(r.time, r.arriveTime),
+        fareSource: r.fareSource || 'estimate',
+      }));
+      const filtered = (f === d && d === today())
+        ? mapped.filter(r => !r.time || r.time >= currentHHMM)
+        : mapped;
+      setSearchResults(filtered);
       saveRecent(f, t, d);
     } catch { addToast?.('Network error — please try again', 'error'); setSearchResults([]); }
     setSearching(false);
@@ -984,12 +1039,11 @@ const BookingScreen = ({ addToast, searchState, setSearchState }) => {
                   {/* Header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                     <div>
-                      <div style={{ ...DISPLAY, fontSize: '17px', color: C.ink }}>Train #{result.train}</div>
-                      <div style={{ ...L(), marginTop: '3px' }}>{getTrainName(result.train)}</div>
+                      <div style={{ ...DISPLAY, fontSize: '17px', color: C.ink }}>{result.trainName || getTrainName(result.train)} #{result.train}</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ ...MONO, fontSize: '20px', fontWeight: 'bold', color: C.fieldBlue, ...TABNUM }}>${result.price}</div>
-                      <div style={{ ...L(), marginTop: '2px' }}>Best fare</div>
+                      <div style={{ ...L(), marginTop: '2px' }}>{result.fareSource === 'estimate' ? 'Est. fare' : 'Current fare'}</div>
                     </div>
                   </div>
 
@@ -1002,6 +1056,7 @@ const BookingScreen = ({ addToast, searchState, setSearchState }) => {
                     <div>
                       <div style={{ ...L(), marginBottom: '3px' }}>Arrive</div>
                       <div style={{ ...MONO, fontSize: '16px', fontWeight: 'bold', color: C.ink, ...TABNUM }}>{result.arrival}</div>
+                      {result.duration && <div style={{ ...BODY, fontSize: '10px', color: C.inkLight, marginTop: '2px', ...TABNUM }}>{result.duration}</div>}
                     </div>
                     <div>
                       <div style={{ ...L(), marginBottom: '3px' }}>{isSameDay ? 'Status' : 'Avg Delay'}</div>
@@ -1012,18 +1067,19 @@ const BookingScreen = ({ addToast, searchState, setSearchState }) => {
                   </div>
 
                   {/* Delay Forecast */}
-                  <div style={{ marginBottom: '12px', padding: '10px 12px', background: C.fieldBlueLightTint, borderRadius: '4px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ ...L(C.fieldBlue), marginBottom: '3px' }}>Delay Forecast</div>
-                        <div style={{ ...MONO, fontSize: '15px', fontWeight: 'bold', color: delayColor, ...TABNUM }}>{delayRange}</div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ ...L(), marginBottom: '2px' }}>Confidence</div>
-                        <div style={{ ...MONO, fontSize: '16px', fontWeight: 'bold', color: C.inkMid, ...TABNUM }}>{result.aiConfidence}%</div>
+                  {isSameDay ? (
+                    <div style={{ marginBottom: '12px', padding: '10px 12px', background: C.fieldBlueLightTint, borderRadius: '4px' }}>
+                      <div style={{ ...L(C.fieldBlue), marginBottom: '3px' }}>Delay Forecast</div>
+                      <div style={{ ...MONO, fontSize: '15px', fontWeight: 'bold', color: delayColor, ...TABNUM }}>{delayRange}</div>
+                    </div>
+                  ) : (
+                    <div style={{ marginBottom: '12px', padding: '10px 12px', background: C.paperDark, borderRadius: '4px' }}>
+                      <div style={{ ...L(), marginBottom: '3px' }}>Historical Avg Delay</div>
+                      <div style={{ ...MONO, fontSize: '15px', fontWeight: 'bold', color: result.avgDelay === 0 ? C.successGreen : C.orange, ...TABNUM }}>
+                        {result.avgDelay === 0 ? 'Typically on time' : `+${result.avgDelay} min`}
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Fare History */}
                   <FareChart
@@ -1084,6 +1140,8 @@ const NavBar = ({ active, onNav }) => (
       @keyframes fadeInUp { from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)} }
       @keyframes shimmer { 0%{background-position:-200% 0}100%{background-position:200% 0} }
       @keyframes slideUp { from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)} }
+      @keyframes splashFadeUp { from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)} }
+      @keyframes trackSlide { 0%{transform:translateX(-120%)}100%{transform:translateX(320%)} }
       .card-enter { animation: fadeInUp .2s ease-out both; }
       .shimmer { background: linear-gradient(90deg,#f0eee8 25%,#e8e6e0 50%,#f0eee8 75%);background-size:200% 100%;animation:shimmer 1.5s infinite; }
       .book-btn:hover { background: #124480 !important; }
@@ -1107,6 +1165,7 @@ export default function CorridorApp() {
   const [detailScreen, setDetailScreen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [searchState, setSearchState] = useState({ from: 'NYP', to: 'WAS', date: today(), results: null });
+  const [showSplash, setShowSplash] = useState(true);
 
   const addToast = useCallback((message, type = 'info', undoFn = null) => {
     const id = Date.now() + Math.random();
@@ -1118,6 +1177,7 @@ export default function CorridorApp() {
 
   return (
     <div style={{ width: '390px', height: '844px', background: C.paper, color: C.ink, fontFamily: "'Barlow Condensed', sans-serif", margin: '0 auto', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
       <div style={{ flex: 1, overflowY: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         {detailScreen && selectedTrip ? (
           <TripDetailScreen trip={selectedTrip} onBack={() => setDetailScreen(false)} addToast={addToast} />
