@@ -80,7 +80,8 @@ const getTrainName = (trainNumber) => {
 const formatDate = (dateStr) => {
   if (!dateStr) return '—';
   try {
-    const d = new Date(dateStr + 'T00:00:00');
+    const clean = String(dateStr).slice(0, 10);
+    const d = new Date(clean + 'T00:00:00');
     if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   } catch { return dateStr; }
@@ -89,6 +90,24 @@ const formatDate = (dateStr) => {
 const today     = () => new Date().toISOString().split('T')[0];
 const tomorrowStr = () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; };
 const isPastDate  = (rawDate) => !!rawDate && rawDate < today();
+
+const computeDuration = (dep, arr) => {
+  if (!dep || !arr) return null;
+  const [dh, dm] = dep.split(':').map(Number);
+  const [ah, am] = arr.split(':').map(Number);
+  let mins = (ah * 60 + am) - (dh * 60 + dm);
+  if (mins < 0) mins += 1440;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+};
+
+const addMinutesToTime = (timeStr, mins) => {
+  if (!timeStr || !mins) return timeStr;
+  const [h, m] = timeStr.split(':').map(Number);
+  const total = h * 60 + m + mins;
+  return `${String(Math.floor(total / 60) % 24).padStart(2,'0')}:${String(total % 60).padStart(2,'0')}`;
+};
 
 const getStationName = (code) => STATIONS.find(s => s.code === code)?.name || code;
 
@@ -258,7 +277,12 @@ const ScreenHeader = ({ subtitle, rightContent }) => (
 
 // ─── STATUS BADGE ────────────────────────────────────────────────
 const StatusBadge = ({ label }) => {
-  const s = { 'ON TIME': { bg: C.greenLight, text: C.green }, 'DELAYED': { bg: C.orangeLight, text: C.orange }, 'CANCELLED': { bg: C.redLight, text: C.red } }[label] || { bg: C.greenLight, text: C.green };
+  const s = {
+    'ON TIME':   { bg: C.greenLight,  text: C.green },
+    'DELAYED':   { bg: C.orangeLight, text: C.orange },
+    'CANCELLED': { bg: C.redLight,    text: C.red },
+    'DEPARTED':  { bg: C.paperDark,   text: C.inkMid },
+  }[label] || { bg: C.greenLight, text: C.green };
   return (
     <div style={{ ...DISPLAY, fontSize: '10px', letterSpacing: '0.08em', background: s.bg, color: s.text, border: `1.5px solid ${s.text}`, borderRadius: '3px', padding: '3px 8px', display: 'inline-block' }}>
       {label}
@@ -284,7 +308,7 @@ const TrackTrainBtn = ({ onPress }) => (
     onClick={onPress}
     className="book-btn"
     style={{
-      ...DISPLAY, fontSize: '12px', padding: '14px', borderRadius: '4px',
+      ...DISPLAY, fontSize: '13px', padding: '16px', borderRadius: '4px',
       background: C.fieldBlue, color: '#fff', border: 'none', cursor: 'pointer',
       width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
     }}
@@ -300,11 +324,16 @@ const TripCard = ({ trip, onClick, onDelete, isNext, index = 0, dimmed = false }
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
 
-  const accentColor = trip.statusType === 'ontime' ? C.fieldBlue : trip.statusType === 'cancelled' ? C.red : C.orange;
-  const delayRange   = getDelayRange(trip.aiDelay);
-  const delayColor   = (trip.aiDelay || 0) === 0 ? C.successGreen : C.orange;
+  const now          = new Date();
+  const nowHHMM      = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   const isToday      = trip.rawDate === today();
   const isTomorrow   = trip.rawDate === tomorrowStr();
+  const hasDeparted  = isToday && !!trip.departure && trip.departure <= nowHHMM;
+  const isDelayed    = (trip.aiDelay || 0) > 0;
+  const estimatedDep = hasDeparted && isDelayed ? addMinutesToTime(trip.departure, trip.aiDelay) : null;
+  const accentColor  = hasDeparted ? C.inkLight : trip.statusType === 'ontime' ? C.fieldBlue : trip.statusType === 'cancelled' ? C.red : C.orange;
+  const delayRange   = getDelayRange(trip.aiDelay);
+  const delayColor   = (trip.aiDelay || 0) === 0 ? C.successGreen : C.orange;
   const countdown    = isNext ? getCountdown(trip.rawDate, trip.departure) : null;
 
   const onTouchStart = e => { touchStartX.current = e.touches[0].clientX; touchStartY.current = e.touches[0].clientY; };
@@ -362,13 +391,18 @@ const TripCard = ({ trip, onClick, onDelete, isNext, index = 0, dimmed = false }
                 {isToday ? 'Today' : isTomorrow ? 'Tomorrow' : (trip.date || '—')} · {trip.fromCode} → {trip.toCode}
               </div>
             </div>
-            {(isToday || isTomorrow) && <StatusBadge label={trip.statusLabel || 'ON TIME'} />}
+            {isToday && hasDeparted
+              ? <StatusBadge label="DEPARTED" />
+              : (isToday || isTomorrow)
+              ? <StatusBadge label={trip.statusLabel || 'ON TIME'} />
+              : null}
           </div>
 
           {/* Times */}
           <div style={{ padding: '0 14px 10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ minWidth: '52px' }}>
-              <div style={{ ...MONO, fontSize: '22px', fontWeight: 'bold', color: C.ink, ...TABNUM }}>{trip.departure || '—'}</div>
+              <div style={{ ...MONO, fontSize: '22px', fontWeight: 'bold', color: hasDeparted && isDelayed ? C.inkLight : C.ink, ...TABNUM, textDecoration: hasDeparted && isDelayed ? 'line-through' : 'none' }}>{trip.departure || '—'}</div>
+              {estimatedDep && <div style={{ ...MONO, fontSize: '15px', fontWeight: 'bold', color: C.orange, ...TABNUM }}>{estimatedDep}</div>}
               <div style={{ ...DISPLAY, fontSize: '11px', color: C.inkMid }}>{trip.fromCode}</div>
             </div>
             <div style={{ flex: 1 }}><TripProgressBar progress={trip.progress || 0} /></div>
@@ -432,7 +466,7 @@ const TripsScreen = ({ onSelectTrip, onTrackTrain, addToast }) => {
       const seen = new Set();
       const mapped = data
         .filter(t => { const k = `${t.trainNumber}-${t.date}`; if (seen.has(k)) return false; seen.add(k); return true; })
-        .map(t => ({ ...t, trainName: getTrainName(t.trainNumber), number: t.trainNumber, rawDate: t.date, date: formatDate(t.date), aiConfidence: t.aiConfidence || 72 }));
+        .map(t => ({ ...t, trainName: getTrainName(t.trainNumber), number: t.trainNumber, rawDate: String(t.date).slice(0,10), date: formatDate(t.date), aiConfidence: t.aiConfidence || 72 }));
       setTrips(mapped);
       setLastUpdated(new Date());
     } catch { addToast?.('Could not load trips', 'error'); }
@@ -446,7 +480,7 @@ const TripsScreen = ({ onSelectTrip, onTrackTrain, addToast }) => {
     try {
       const res = await fetch(`${API_BASE}/api/trips?past=true`);
       const data = await res.json();
-      const mapped = data.map(t => ({ ...t, trainName: getTrainName(t.trainNumber), number: t.trainNumber, rawDate: t.date, date: formatDate(t.date), aiConfidence: t.aiConfidence || 72 }));
+      const mapped = data.map(t => ({ ...t, trainName: getTrainName(t.trainNumber), number: t.trainNumber, rawDate: String(t.date).slice(0,10), date: formatDate(t.date), aiConfidence: t.aiConfidence || 72 }));
       setPastTrips(mapped);
     } catch {}
     setLoadingPast(false);
@@ -855,7 +889,7 @@ const TripDetailScreen = ({ trip, onBack, addToast }) => {
         <button
           onClick={() => window.open(buildAmtrakUrl(trip.fromCode, trip.toCode, trip.rawDate || today()), '_blank')}
           className="book-btn"
-          style={{ width: '100%', ...DISPLAY, fontSize: '11px', padding: '15px', borderRadius: '4px', border: 'none', background: C.fieldBlue, color: '#fff', cursor: 'pointer' }}
+          style={{ width: '100%', ...DISPLAY, fontSize: '13px', padding: '17px', borderRadius: '4px', border: 'none', background: C.fieldBlue, color: '#fff', cursor: 'pointer' }}
         >
           Book on Amtrak →
         </button>
@@ -887,18 +921,26 @@ const BookingScreen = ({ addToast, searchState, setSearchState }) => {
   const runSearch = async (f, t, d) => {
     setSearching(true);
     try {
-      const res = await fetch(`${API_BASE}/api/search?origin=${f}&destination=${t}&date=${d}`);
+      const res = await fetch(`${API_BASE}/api/search?origin=${f}&destination=${t}&date=${d}&live=true`);
       const data = await res.json();
       if (data.error) { addToast?.(data.error, 'error'); setSearchResults([]); setSearching(false); return; }
       if (!Array.isArray(data) || data.length === 0) { setSearchResults([]); setSearching(false); return; }
-      setSearchResults(data.map((r, i) => ({
+      const now = new Date();
+      const currentHHMM = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      const mapped = data.map((r, i) => ({
         id: i + 1, time: r.time, arrival: r.arriveTime, price: r.price,
-        train: r.train, trainType: r.trainType,
+        train: r.train, trainName: r.trainName || getTrainName(r.train),
+        trainType: r.trainType,
         avgDelay: r.delay ?? 0,
-        aiDelay: r.delay ?? 0, aiConfidence: r.aiConfidence || 75,
-        priceHigh: Math.round(r.price * 1.22), priceLow: Math.round(r.price * 0.82),
+        aiDelay: r.delay ?? 0,
         trend: r.trend,
-      })));
+        duration: r.duration || computeDuration(r.time, r.arriveTime),
+        fareSource: r.fareSource || 'estimate',
+      }));
+      const filtered = d === today()
+        ? mapped.filter(r => !r.time || r.time >= currentHHMM)
+        : mapped;
+      setSearchResults(filtered);
       saveRecent(f, t, d);
     } catch { addToast?.('Network error — please try again', 'error'); setSearchResults([]); }
     setSearching(false);
@@ -968,10 +1010,15 @@ const BookingScreen = ({ addToast, searchState, setSearchState }) => {
             onClick={() => runSearch(from, to, date)}
             disabled={searching}
             className="book-btn"
-            style={{ width: '100%', ...DISPLAY, fontSize: '11px', padding: '13px', borderRadius: '4px', border: 'none', background: searching ? C.inkLight : C.fieldBlue, color: '#fff', cursor: searching ? 'default' : 'pointer' }}
+            style={{ width: '100%', ...DISPLAY, fontSize: '13px', padding: '16px', borderRadius: '4px', border: 'none', background: searching ? C.inkLight : C.fieldBlue, color: '#fff', cursor: searching ? 'default' : 'pointer' }}
           >
-            {searching ? 'Searching…' : 'Search Trains'}
+            {searching ? 'Fetching live fares…' : 'Search Trains'}
           </button>
+          {searching && (
+            <div style={{ ...L(), fontSize: '9px', textAlign: 'center', marginTop: '6px', color: C.inkLight }}>
+              Getting real-time prices from Amtrak — may take up to 30s
+            </div>
+          )}
         </div>
 
         {/* Results */}
@@ -1027,6 +1074,10 @@ const BookingScreen = ({ addToast, searchState, setSearchState }) => {
                     <div>
                       <div style={{ ...L(), marginBottom: '3px' }}>Arrive</div>
                       <div style={{ ...MONO, fontSize: '16px', fontWeight: 'bold', color: C.ink, ...TABNUM }}>{result.arrival}</div>
+                      {result.duration && <>
+                        <div style={{ ...L(), marginTop: '5px', marginBottom: '1px' }}>Duration</div>
+                        <div style={{ ...BODY, fontSize: '11px', color: C.inkMid, ...TABNUM }}>{result.duration}</div>
+                      </>}
                     </div>
                     <div>
                       <div style={{ ...L(), marginBottom: '3px' }}>{isSameDay ? 'Status' : 'Avg Delay'}</div>
@@ -1036,17 +1087,11 @@ const BookingScreen = ({ addToast, searchState, setSearchState }) => {
                     </div>
                   </div>
 
-                  {/* Delay Forecast */}
-                  <div style={{ marginBottom: '12px', padding: '10px 12px', background: C.fieldBlueLightTint, borderRadius: '4px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ ...L(C.fieldBlue), marginBottom: '3px' }}>Delay Forecast</div>
-                        <div style={{ ...MONO, fontSize: '15px', fontWeight: 'bold', color: delayColor, ...TABNUM }}>{delayRange}</div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ ...L(), marginBottom: '2px' }}>Confidence</div>
-                        <div style={{ ...MONO, fontSize: '16px', fontWeight: 'bold', color: C.inkMid, ...TABNUM }}>{result.aiConfidence}%</div>
-                      </div>
+                  {/* Avg Delay */}
+                  <div style={{ marginBottom: '12px', padding: '10px 12px', background: C.paperDark, borderRadius: '4px' }}>
+                    <div style={{ ...L(), marginBottom: '3px' }}>Avg Delay</div>
+                    <div style={{ ...MONO, fontSize: '15px', fontWeight: 'bold', color: result.avgDelay === 0 ? C.successGreen : C.orange, ...TABNUM }}>
+                      {result.avgDelay === 0 ? 'Typically on time' : `+${result.avgDelay} min`}
                     </div>
                   </div>
 
@@ -1082,7 +1127,7 @@ const BookingScreen = ({ addToast, searchState, setSearchState }) => {
                   <button
                     onClick={() => window.open(buildAmtrakUrl(from, to, date), '_blank')}
                     className="book-btn"
-                    style={{ width: '100%', ...DISPLAY, fontSize: '10px', padding: '11px', borderRadius: '4px', border: 'none', background: C.fieldBlue, color: '#fff', cursor: 'pointer', marginBottom: '6px' }}
+                    style={{ width: '100%', ...DISPLAY, fontSize: '12px', padding: '15px', borderRadius: '4px', border: 'none', background: C.fieldBlue, color: '#fff', cursor: 'pointer', marginBottom: '8px' }}
                   >
                     Book on Amtrak →
                   </button>
@@ -1090,7 +1135,7 @@ const BookingScreen = ({ addToast, searchState, setSearchState }) => {
                     onClick={() => !isSaved && handleSave(result)}
                     disabled={isSaved}
                     style={{
-                      width: '100%', ...DISPLAY, fontSize: '10px', padding: '11px', borderRadius: '4px',
+                      width: '100%', ...DISPLAY, fontSize: '12px', padding: '15px', borderRadius: '4px',
                       border: `1px solid ${isSaved ? C.successGreen : C.fieldBlue}`,
                       background: isSaved ? C.greenLight : 'transparent',
                       color: isSaved ? C.successGreen : C.fieldBlue,
