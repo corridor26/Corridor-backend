@@ -3,17 +3,20 @@ import pool from '../config/database.js';
 
 export async function predictDelay(trip) {
   try {
-    // Determine if trip is in future or current
     const now = new Date();
     const tripDateTime = new Date(`${trip.departure_date}T${trip.departure_time}`);
     const hoursUntilDeparture = (tripDateTime - now) / (1000 * 60 * 60);
 
-    // If train departs within 2 hours, use real-time delay
     if (hoursUntilDeparture <= 2 && hoursUntilDeparture > 0) {
       return await getRealTimeDelay(trip.train_number, trip.departure_date);
     }
 
-    // Otherwise use historical patterns
+    // Try ASMAD train-specific history first (most accurate)
+    if (trip.train_number && trip.origin) {
+      const asmad = await getAsmadDelay(trip.train_number, trip.origin, tripDateTime);
+      if (asmad) return asmad;
+    }
+
     return await getHistoricalDelay(trip.origin, trip.destination, tripDateTime);
   } catch (error) {
     console.error('Error predicting delay:', error);
@@ -54,6 +57,52 @@ async function getRealTimeDelay(trainNumber, departureDate) {
   } catch (error) {
     console.error('Error getting real-time delay:', error);
     return { predictedDelay: 0, confidence: 0 };
+  }
+}
+
+async function getAsmadDelay(trainNumber, originStation, tripDateTime) {
+  try {
+    const dayOfWeek = tripDateTime.getDay();
+
+    // Exact train + day-of-week match at the origin station
+    const result = await pool.query(
+      `SELECT
+         ROUND(AVG(delay_minutes))                                            AS avg_delay,
+         COUNT(*)                                                             AS sample_size,
+         ROUND(100.0 * COUNT(*) FILTER (WHERE delay_minutes < 10)
+               / NULLIF(COUNT(*), 0))                                        AS under10,
+         ROUND(100.0 * COUNT(*) FILTER (WHERE delay_minutes BETWEEN 10 AND 29)
+               / NULLIF(COUNT(*), 0))                                        AS b10_30,
+         ROUND(100.0 * COUNT(*) FILTER (WHERE delay_minutes >= 30)
+               / NULLIF(COUNT(*), 0))                                        AS over30
+       FROM asmad_observations
+       WHERE train_number = $1
+         AND station      = $2
+         AND day_of_week  = $3
+         AND delay_minutes IS NOT NULL`,
+      [String(trainNumber), originStation, dayOfWeek]
+    );
+
+    const row = result.rows[0];
+    if (!row || row.avg_delay == null || Number(row.sample_size) < 5) return null;
+
+    const baseDelay = parseFloat(row.avg_delay) || 0;
+    const confidence = calculateConfidence(Number(row.sample_size));
+
+    return {
+      predictedDelay: Math.round(baseDelay),
+      confidence,
+      reasoning: `Based on ${row.sample_size} historical runs of train ${trainNumber} on ${getDayName(dayOfWeek)}s`,
+      delayDistribution: {
+        '<10min':   Number(row.under10)  || 60,
+        '10-30min': Number(row.b10_30)   || 25,
+        '30+min':   Number(row.over30)   || 15,
+      },
+      source: 'asmad',
+    };
+  } catch (err) {
+    console.error('ASMAD delay lookup error:', err.message);
+    return null;
   }
 }
 

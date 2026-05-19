@@ -2,6 +2,7 @@
 import cron from 'node-cron';
 import { scrapeAmtrakDelays } from '../scrapers/amtrakScraper.js';
 import { scrapeAmtrakPrices, seedHistoricalDelays } from '../scrapers/priceScraper.js';
+import { scrapeAsmad } from '../scripts/scrapeAsmad.js';
 
 export function initializeScheduler() {
   console.log('[SCHEDULER] Initializing cron jobs...');
@@ -36,10 +37,21 @@ export function initializeScheduler() {
     }
   });
 
+  // ASMAD scrape: weekly on Sunday at 3 AM (~15-30 min run)
+  cron.schedule('0 3 * * 0', async () => {
+    console.log('[CRON] Running weekly ASMAD delay history scrape...');
+    try {
+      await scrapeAsmad();
+    } catch (error) {
+      console.error('[CRON] Error in ASMAD scraper:', error);
+    }
+  });
+
   console.log('[SCHEDULER] ✓ All cron jobs scheduled:');
   console.log('  - Delays scraper: Every hour at :00');
   console.log('  - Price scraper: Every hour at :15');
   console.log('  - Historical seed: Daily at 2:00 AM');
+  console.log('  - ASMAD scraper: Weekly on Sunday at 3:00 AM');
 }
 
 // For testing: Run scrapers immediately on startup

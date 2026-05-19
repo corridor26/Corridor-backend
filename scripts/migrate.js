@@ -70,6 +70,44 @@ CREATE TABLE IF NOT EXISTS scraper_logs (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS asmad_observations (
+  id BIGSERIAL PRIMARY KEY,
+  train_number VARCHAR(10) NOT NULL,
+  station      VARCHAR(10) NOT NULL,
+  departure_date DATE NOT NULL,
+  day_of_week  SMALLINT,
+  scheduled_departure TIME,
+  actual_departure    TIME,
+  delay_minutes INTEGER,
+  scraped_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(train_number, station, departure_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_asmad_train_station
+  ON asmad_observations(train_number, station, day_of_week);
+
+CREATE INDEX IF NOT EXISTS idx_asmad_station_dow
+  ON asmad_observations(station, day_of_week, scheduled_departure);
+
+CREATE TABLE IF NOT EXISTS fare_observations (
+  id BIGSERIAL PRIMARY KEY,
+  origin VARCHAR(10) NOT NULL,
+  destination VARCHAR(10) NOT NULL,
+  departure_date DATE NOT NULL,
+  train_number VARCHAR(20) NOT NULL,
+  departure_time TIME,
+  arrival_time TIME,
+  lowest_fare DECIMAL(10,2),
+  fare_class VARCHAR(50),
+  sold_out BOOLEAN DEFAULT false,
+  observed_at TIMESTAMP NOT NULL,
+  scrape_success BOOLEAN DEFAULT true,
+  scrape_error TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_fare_obs_lookup
+  ON fare_observations(origin, destination, departure_date, scrape_success, observed_at);
+
 CREATE INDEX IF NOT EXISTS idx_trips_departure_date ON trips(departure_date);
 CREATE INDEX IF NOT EXISTS idx_delays_train_number ON delays(train_number);
 CREATE INDEX IF NOT EXISTS idx_prices_origin_dest ON prices(origin, destination, departure_date);
